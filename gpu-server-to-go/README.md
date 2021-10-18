@@ -2,6 +2,10 @@
 ## 设备
 - 普通U盘一个，用作ubuntu引导启动盘
 - 移动硬盘/性能较好的U盘一个，用作安装Ubuntu Server
+> 性价比搭配推荐  
+> [绿联硬盘盒(ASM2362主控)](https://item.jd.com/100024158744.html)  
+> [佳翼散热片(硅片->铜片->铝壳)](https://item.jd.com/100004807325.html)  
+> [NVME固态硬盘](https://item.jd.com/100007080973.html)
 
 ## BIOS设置
 进入要使用的电脑的BIOS，关闭Secure Boot(安全启动)，否则在USB设备下无法加载GPU  
