@@ -3,7 +3,7 @@ version: "3.7"
 services:
   aigroup:
     image: aigroup:tensorflow-21.09
-    hostname: aigroup
+    hostname: tensorflow
     ports:
       - "8888:8888"
       - "1234:22"
@@ -22,7 +22,7 @@ services:
           devices:
             - capabilities: [ gpu ]
               count: all
-    container_name: aigroup
+    container_name: tensorflow
 
   tensorboard:
     image: aigroup:tensorflow-21.09
