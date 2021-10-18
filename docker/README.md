@@ -22,7 +22,7 @@
 > TensorRT的版本要与Triton Server版本保持兼容, 版本对应关系参考[支持矩阵](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html)
 
 ## 启动容器
-`docker-compose -f gpu.yml up -d`
+`docker-compose -p gpu -f gpu.yml up -d`
 
 > 包括:
 > 
