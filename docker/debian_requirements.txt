@@ -1,0 +1,12 @@
+sudo  
+vim  
+curl  
+git  
+build-essential  
+dos2unix  
+procps  
+net-tools   
+htop  
+proxychains    
+lrzsz  
+tree  

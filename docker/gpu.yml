@@ -1,0 +1,93 @@
+version: "3.7"
+
+services:
+  aigroup:
+    image: aigroup:ngc-tensorflow-21.09
+    hostname: aigroup
+    ports:
+      - "8888:8888"
+      - "1234:22"
+    volumes:
+      - "/data/aigroup:/root/aigroup"
+      - "/etc/localtime:/etc/localtime"
+    environment:
+      ROOT_PASS: "123456"
+      NOTEBOOK_PASS: "123456"
+      NOTEBOOK_USER: "aigroup"
+    tty: true
+    command: bash
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [ gpu ]
+              count: all
+    container_name: aigroup
+
+  tensorboard:
+    image: aigroup:ngc-tensorflow-21.09
+    hostname: tensorboard
+    ports:
+      - "6006:6006"
+    volumes:
+      - "/data/aigroup:/root/aigroup"
+      - "/etc/localtime:/etc/localtime"
+    environment:
+      ROOT_PASS: "123456"
+      NOTEBOOK_PASS: "123456"
+      NOTEBOOK_USER: "aigroup"
+    tty: true
+    command: tensorboard --logdir=/root/aigroup/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [ gpu ]
+              count: all
+    container_name: tensorboard
+
+  triton_server:
+    image: aigroup:triton-21.09
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    shm_size: "10gb"
+    hostname: triton_server
+    ports:
+      - "12345:22"
+      - "18000:8000"
+      - "18001:8001"
+      - "18002:8002"
+    volumes:
+      - "/data/aigroup:/root/aigroup"
+      - "/etc/localtime:/etc/localtime"
+    environment:
+      ROOT_PASS: "123456"
+      NVIDIA_VISIBLE_DEVICES: "all"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [ gpu ]
+              count: all
+    container_name: triton_server
+
+  tensorrt:
+    image: aigroup:tensorrt-8.0.3
+    hostname: tensorrt
+    ports:
+      - "10098:22"
+      - "10099:8888"
+    volumes:
+      - "/data/aigroup:/root/aigroup"
+      - "/etc/localtime:/etc/localtime"
+    environment:
+      ROOT_PASS: "123456"
+      NVIDIA_VISIBLE_DEVICES: "all"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [ gpu ]
+              count: all
+    container_name: tensorrt
