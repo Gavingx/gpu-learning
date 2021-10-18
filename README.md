@@ -1,4 +1,4 @@
-# gpu-learning
+# GPU-Learning
 some awesome gpu-learning tutorial
 
 - GPU训练推理一体化环境搭建
