@@ -24,10 +24,11 @@
 ## 启动容器
 `docker-compose -f gpu.yml up -d`
 
-包括:
-- Tensorflow容器用于模型的训练
-- Triton Server容器用于模型的推理
-- TensorRT容器用于构建推理图
-- Tensorboard容器
+> 包括:
+> 
+> - Tensorflow容器用于模型的训练
+> - Triton Server容器用于模型的推理
+> - TensorRT容器用于构建推理图
+> - Tensorboard容器
 
 

@@ -68,7 +68,7 @@ RUN pip3 install \
     torch \
     Pillow \
     numpy \
-    pycuda<2021.1 \
+    pycuda \
     pytest \
     minio
 
@@ -84,8 +84,7 @@ RUN cd /usr/local/bin && wget https://ngc.nvidia.com/downloads/ngccli_cat_linux.
 
 # Git获取源码
 RUN cd /workspace && git clone -b master https://github.com/nvidia/TensorRT TensorRT && \
-    cd /workspace/TensorRT && git submodule update --init --recursive && \
-    git config --global --unset http.proxy && git config --global --unset https.proxy
+    cd /workspace/TensorRT && git submodule update --init --recursive
 
 # Set environment and working directory
 ENV TRT_LIBPATH /usr/lib/x86_64-linux-gnu

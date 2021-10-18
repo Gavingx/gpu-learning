@@ -1,0 +1,88 @@
+# GPU Server To Go
+## 设备
+- 普通U盘一个，用作ubuntu引导启动盘
+- 移动硬盘/性能较好的U盘一个，用作安装Ubuntu Server
+
+## BIOS设置
+进入要使用的电脑的BIOS，关闭Secure Boot(安全启动)，否则在USB设备下无法加载GPU  
+若输入nvidia-smi命令会出现以下报错:  
+`NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running`
+
+## 安装步骤
+- 下载ubuntu server的[iso镜像](https://ubuntu.com/download/server)  
+![1.png](1.png)  
+
+
+- 将iso内的文件拷贝入引导启动U盘中
+![2.png](2.png)
+
+
+- 同时插入启动U盘和要安装移动式系统的移动硬盘，  
+  重启电脑，启动项选择U盘启动，进入ubuntu安装环节，安装盘选择移动硬盘整个磁盘。  
+
+
+- 安装完成后重启电脑，启动项选择移动硬盘启动进入ubuntu server终端。 
+
+
+- [装GPU驱动](https://packages.ubuntu.com/search?keywords=nvidia-driver-470-server)  
+  驱动版本可以选择最新版本  
+  `apt update && apt install nvidia-driver-470-server`
+
+
+- 设置SSH服务  
+
+    1. 设置root密码：  
+       `sudo passwd root`
+    2. root用户:  
+       `su root`
+    3. 修改SSH配置文件`/etc/ssh/sshd_config`  
+       `PermitRootLogin yes`  
+       `PasswordAuthentication yes`  
+	
+        或者直接用sed命令替换:  
+        `sed -i "s/.*PermitRootLogin.*/PermitRootLogin yes/g" /etc/ssh/sshd_config && \`  
+        `sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication yes/g" /etc/ssh/sshd_config `
+    4. 重启SSH服务：  
+       `service sshd restart`
+
+- 切换时区
+
+## 注意事项
+### 使用不同电脑时网络往往需要重新设置
+1. 查看网络连接的名称  
+   `ls /sys/class/net`
+
+
+2. 修改`/etc/netplan/`下的`yml`配置文件  
+   参考: https://netplan.io/examples/
+> 例子
+> ```
+> network:   
+>    ethernets:
+>        eth0:
+>            dhcp4: true
+>            optional: true
+>    version: 2
+>    wifis:
+>        wifi_name:
+>            dhcp4: true
+>            optional: true
+>            access-points:
+>                "SSID_name":
+>                    password: "WiFi_password"
+> ```
+>
+
+3. `netplan --debug generate`
+4. `netplan --debug apply`
+5. `reboot`
+
+
+### GUI和Terminal终端的切换
+Ctrl + Alt + F1切换到GUI，Ctrl + Alt + F2切换到终端  
+
+
+
+
+
+
