@@ -109,3 +109,7 @@ venv.bak/
 
 # csv
 *.csv
+
+# data
+**/dll/
+**/pretrain_models
