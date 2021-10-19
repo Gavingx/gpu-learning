@@ -2,7 +2,7 @@ version: "3.7"
 
 services:
   tensorflow:
-    image: aigroup:tensorflow-21.09
+    image: rivia/tensorflow-1:21.09
     hostname: tensorflow
     ports:
       - "0.0.0.0:8888:8888"
@@ -26,7 +26,7 @@ services:
     container_name: tensorflow
 
   pytorch:
-    image: aigroup:pytorch-21.09
+    image: rivia/pytorch:21.09
     hostname: pytorch
     ports:
       - "0.0.0.0:18888:8888"
@@ -50,7 +50,7 @@ services:
     container_name: pytorch
 
   tensorrt:
-    image: aigroup:tensorrt-8.0.3
+    image: rivia/tensorrt:8.0.3
     hostname: tensorrt
     ports:
       - "0.0.0.0:10001:22"
@@ -71,7 +71,7 @@ services:
     container_name: tensorrt
 
   triton_server:
-    image: aigroup:triton-21.09
+    image: rivia/triton:21.09
     ulimits:
       memlock: -1
       stack: 67108864
@@ -98,7 +98,7 @@ services:
     container_name: triton_server
 
   tensorboard:
-    image: aigroup:tensorflow-21.09
+    image: rivia/tensorflow-1:21.09
     hostname: tensorboard
     ports:
       - "0.0.0.0:6006:6006"

@@ -14,14 +14,19 @@
 
 ## 构建镜像
 `export NGC_VERSION=21.09 && `     
-`docker build --build-arg NGC_VERSION=${NGC_VERSION} -t aigroup:pytorch-${NGC_VERSION} -f pytorch.Dockerfile . && `  
-`docker build --build-arg NGC_VERSION=${NGC_VERSION} -t aigroup:tensorflow-${NGC_VERSION} -f tensorflow.Dockerfile . && `  
-`docker build --build-arg NGC_VERSION=${NGC_VERSION} -t aigroup:triton-${NGC_VERSION} -f triton.Dockerfile . && `  
-`docker build -t aigroup:tensorrt-8.0.3 -f tensorrt.Dockerfile .`  
+`docker build --build-arg NGC_VERSION=${NGC_VERSION} -t rivia/pytorch:${NGC_VERSION} -f pytorch.Dockerfile . && `  
+`docker build --build-arg NGC_VERSION=${NGC_VERSION} -t rivia/tensorflow-1:${NGC_VERSION} -f tensorflow.Dockerfile . && `  
+`docker build --build-arg NGC_VERSION=${NGC_VERSION} -t rivia/triton:${NGC_VERSION} -f triton.Dockerfile . && `  
+`docker build -t rivia/tensorrt:8.0.3 -f tensorrt.Dockerfile .`  
 
 > TensorRT的版本要与Triton Server版本保持兼容, 版本对应关系参考[支持矩阵](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html)
 
 ## 启动容器
+替换为自己要设置的密码和用户  
+`sed -i "s/aigroup/your_username/g" gpu.yml`   
+`sed -i "s/123456/your_password/g" gpu.yml`  
+
+启动容器  
 `docker-compose -p gpu -f gpu.yml up -d`
 
 > 包括:
