@@ -1,8 +1,108 @@
-## Faster-Bert-As-Service
+# Faster-Bert-As-Service
 高性能BERT推理服务
 
-`GPU_MODEL=850M PRETRAIN_DIR=`pwd`/pretrain-models/bert-base-chinese 
-python3 builder.py -m $PRETRAIN_DIR/bert_model.ckpt 
- -o /root/kan/models/bert-base-chinese/1/model.plan -s 64 -g -b 1 -b 2 -w 1800 -c $PRETRAIN_DIR`
+## 环境搭建
+参考[Unified GPU Environment](https://github.com/xiangyangkan/gpu-learning/tree/main/docker)
+需要使用TensorRT, Triton Server和Tensorflow容器
 
-`LD_PRELOAD=/root/kan/libnvinfer_plugin_gtx850m.so tritonserver --model-store=/root/kan/models --strict-model-config=false --http-thread-count 32`
+> TIPS  
+> - 查看TensorRT版本:   
+  `nm -D /usr/lib/x86_64-linux-gnu/libnvinfer.so.7 | grep tensorrt_version`
+> - 查看宿主机GPU环境版本:  
+  `cat /usr/local/cuda/version.json`
+
+## 编译
+- 进入tensorrt容器  
+`docker exec -it tensorrt bash`
+
+- 编译动态链接库文件  
+``cd /workspace/TensorRT && mkdir -p build && cd build && cmake .. -DTRT_LIB_DIR=$TRT_LIBPATH -DTRT_OUT_DIR=`pwd`/out && make -j$(nproc)``  
+  `out`目录下的`libnvinfer_plugin*.so`就是在构建engine时需要用到的动态链接库文件  
+
+- 将so文件放在项目的`gpu-learning/tensorrt/BERT/dll/`目录下  
+  以GTX1050显卡为例, 重命名为`libnvinfer_plugin_gtx1050.so`
+
+> 如果没有/workspace/TensorRT目录, 可以手动拉取  
+> `cd /workspace && git clone -b master https://github.com/nvidia/TensorRT TensorRT`  
+> `cd TensorRT && git submodule update --init --recursive`
+
+## 构建BERT engine
+以 [bert-base-chinese](https://huggingface.co/bert-base-chinese) 预训练模型的池化层输出为例：  
+
+- 下载 [bert-base-chinese](https://storage.googleapis.com/bert_models/2018_11_03/chinese_L-12_H-768_A-12.zip) 模型，
+  放在项目的`gpu-learning/tensorrt/BERT/pretrain-models/bert-base-chinese`目录下 
+
+- 导出engine  
+``export GPU_MODEL=1050 PRETRAIN_DIR=`pwd`/pretrain-models/bert-base-chinese``    
+`python3 builder.py -m $PRETRAIN_DIR/bert_model.ckpt -o engine_file/bert-base-chinese/1/model.plan 
+ -s 16 -g -b 1 -b 2 --fp16 -w 1800 -c $PRETRAIN_DIR`
+
+> 参数解释：   
+> [GPU_MODEL](https://github.com/xiangyangkan/gpu-learning/blob/main/tensorrt/BERT/builder.py#L37): 用于指定使用哪个.so文件, 不同卡的.so文件的有区别的  
+> PRETRAIN_DIR: 预训练模型文件所在目录  
+> -m: 指定ckpt文件位置  
+> -o: 导出engine文件位置  
+> -s: 最大序列长度  
+> -g: 使用通用矩阵乘法实现FC2 layer  
+> -b: batch_size大小, 可设置多组, 每个batch_size对应一个profile  
+> --fp16: 使用半精度推理  
+> -w: 构建时分配的显存大小, 在不爆显存的情况下越大越好  
+> -c: bert config文件所在目录  
+
+
+## 启动Triton服务  
+- 进入triton server容器    
+`docker exec -it triton_server bash`
+
+- 在项目当前目录下启动triton服务  
+`LD_PRELOAD=./dll/libnvinfer_plugin_gtx1050.so tritonserver --model-store=./engine_file
+ --strict-model-config=false --http-thread-count 32`
+
+> 注意事项
+> - 若显卡型号较旧, 指定`--min-supported-compute-capability x.x` 使triton支持  
+>   [显卡计算等级查询](https://developer.nvidia.com/zh-cn/cuda-gpus)
+> - 要查看具体启动错误信息, 指定`--strict-model-config=true`
+> - 要打印详细日志, 指定`--log-verbose=1`, 但此时并发性能会受日志写入硬盘速度的限制而大幅降低
+> - 自定义插件生效必须指定`LD_PRELOAD`, 否则默认使用`/usr/lib/x86_64-linux-gnu/libnvinfer_plugin.so`
+> - 不同型号的卡导出engine时需要在相同的软硬件条件下重新编译对应的动态链接库，且导出engine时也需要在相应的硬件条件下(否则triton会报compute version错误)  
+
+## 参考资料  
+- [TensorRT的数据格式](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#data-format-desc)  
+- [Enabling Fusion](https://docs.nvidia.com/deeplearning/tensorrt/best-practices/index.html#enable-fusion)  
+- [Softmax, TopK等layer指定轴向时需要输入bitmap型数值](https://docs.nvidia.com/deeplearning/tensorrt/api/c_api/classnvinfer1_1_1_i_soft_max_layer.html#a866ec69eb976e965b1c5c9f75ede189c) ，如 1>> 1 表示 0010
+
+## FAQ  
+### 如何估计Triton的显存占用
+总实例数 = 模型数 * 实例数  
+内存占用= 总实例数 * 模型大小 * profile数量 
+
+### 如何搜索最佳的max_batch_size
+GPU利用率占满时, 说明算力短板占主导，应该增大MAX_BATCH_SIZE；  
+GPU利用率偏低时, 说明队列等待延迟占主导，应该减小MAX_BATCH_SIZE。  
+最佳配置就是在减少kernel调用次数和队列等待损失之间寻找一个最佳的平衡点。
+
+### 如何编写自定义插件
+https://github.com/NVIDIA/TensorRT/tree/master/samples/python/uff_custom_plugin
+
+### [Triton配置文件](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md)
+- 存在max_batch_size时，会自动在最前面补一个-1维度，例如dims填[32, 4]会自动填充为[-1, 32, 4]
+- reshape参数是为了应对dims为0维度，即只有batch size维度的情形，dims填写[ 1 ]并使用reshape: { shape: [ ] }
+- shape tensors参数表示dims为shape tensors时，triton认定dims的第一维的值为batch size，将不进行自动填充；
+
+## 为什么快？
+### FP16/INT8 推理
+对于BERT finetune任务: 
+- 训练阶段时建议使用混合精度训练，这样在推理时使用FP16模式对精度效果影响很小；
+- 训练阶段时建议使用QAT训练，这样在推理时使用INT8模式对精度效果影响很小；
+
+### 核融合
+自定义的TensorRT的插件实现了Transformer网络的kernel fusion, 
+除了gemm运算之外尽量进行算子融合，可以大幅减少kernel调用次数；
+
+### 优化了Google BERT预处理模块处理速度
+### 独创的二进制截断处理
+如果模型的输出是一个长向量，此时的json在反序列化时的并发性能是很差的。  
+因此可以强制使triton返回二进制格式的向量, 直接对json数据做固定字节数的截断进行强制解析，同时不影响剩余json部分的解析。 
+如果输出的向量数据仍然太大，可以在下游添加残差网络进行降维。
+
+

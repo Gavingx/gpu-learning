@@ -415,10 +415,11 @@ def emb_layernorm(builder, network, config, weights_dict, builder_config, sequen
     # Make sure the profile also works for all sizes not covered by the previous profile.
 
     if len(sequence_lengths) > 1 or len(batch_sizes) > 1:
+        prev_batch_size = 0
         for batch_size in sorted(batch_sizes):
             if len(sequence_lengths) == 1:
                 profile = builder.create_optimization_profile()
-                min_shape = (sequence_lengths[0], 1)
+                min_shape = (sequence_lengths[0], prev_batch_size + 1)
                 shape = (sequence_lengths[0], batch_size)
                 if BATCH_DIM_IS_FIRST:
                     min_shape = min_shape[::-1]
@@ -428,9 +429,10 @@ def emb_layernorm(builder, network, config, weights_dict, builder_config, sequen
                 profile.set_shape("input_mask", min=min_shape, opt=shape, max=shape)
                 builder_config.add_optimization_profile(profile)
             else:
+                prev_sequence_length = 0
                 for sequence_length in sorted(sequence_lengths):
                     profile = builder.create_optimization_profile()
-                    min_shape = (sequence_length, 1)
+                    min_shape = (prev_sequence_length + 1, prev_batch_size + 1)
                     shape = (sequence_length, batch_size)
                     if BATCH_DIM_IS_FIRST:
                         min_shape = min_shape[::-1]
@@ -439,6 +441,7 @@ def emb_layernorm(builder, network, config, weights_dict, builder_config, sequen
                     profile.set_shape("segment_ids", min=min_shape, opt=shape, max=shape)
                     profile.set_shape("input_mask", min=min_shape, opt=shape, max=shape)
                     builder_config.add_optimization_profile(profile)
+            prev_batch_size = batch_size
 
     wbeta = trt.PluginField("bert_embeddings_layernorm_beta", weights_dict["bert_embeddings_layernorm_beta"].numpy(),
                             trt.PluginFieldType.FLOAT32)

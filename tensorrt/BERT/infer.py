@@ -105,8 +105,7 @@ def triton_post(input_str, tokenizer, max_seq_length, url, session, engine_mode=
     if engine_mode:
         # engine 版本
         binary_res = session.post(url, ujson.dumps(input_str)).content
-        return binary_res
-        # return np.frombuffer(binary_res[-3072:], dtype='<f4')
+        return np.frombuffer(binary_res[-3072:], dtype='<f4')
     else:
         # savemodel 版本
         res = session.post(url, ujson.dumps({'inputs': input_str})).json()
