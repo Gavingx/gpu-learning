@@ -2,7 +2,7 @@
 高性能BERT推理服务
 
 ## 环境搭建
-参考[Unified GPU Environment](https://github.com/xiangyangkan/gpu-learning/tree/main/docker)
+参考[Unified GPU Environment](https://github.com/xiangyangkan/gpu-learning/tree/main/docker)  
 需要使用TensorRT, Triton Server和Tensorflow容器
 
 > TIPS  
@@ -72,22 +72,24 @@
 - [Softmax, TopK等layer指定轴向时需要输入bitmap型数值](https://docs.nvidia.com/deeplearning/tensorrt/api/c_api/classnvinfer1_1_1_i_soft_max_layer.html#a866ec69eb976e965b1c5c9f75ede189c) ，如 1>> 1 表示 0010
 
 ## FAQ  
-### 如何估计Triton的显存占用
+- 如何估计Triton的显存占用  
 总实例数 = 模型数 * 实例数  
-内存占用= 总实例数 * 模型大小 * profile数量 
+内存占用= 总实例数 * 模型大小 * profile数量  
 
-### 如何搜索最佳的max_batch_size
+
+- 如何搜索最佳的max_batch_size  
 GPU利用率占满时, 说明算力短板占主导，应该增大MAX_BATCH_SIZE；  
 GPU利用率偏低时, 说明队列等待延迟占主导，应该减小MAX_BATCH_SIZE。  
 最佳配置就是在减少kernel调用次数和队列等待损失之间寻找一个最佳的平衡点。
 
-### 如何编写自定义插件
+  
+- 如何编写自定义插件  
 https://github.com/NVIDIA/TensorRT/tree/master/samples/python/uff_custom_plugin
 
-### [Triton配置文件](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md)
-- 存在max_batch_size时，会自动在最前面补一个-1维度，例如dims填[32, 4]会自动填充为[-1, 32, 4]
-- reshape参数是为了应对dims为0维度，即只有batch size维度的情形，dims填写[ 1 ]并使用reshape: { shape: [ ] }
-- shape tensors参数表示dims为shape tensors时，triton认定dims的第一维的值为batch size，将不进行自动填充；
+- [Triton配置文件](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md)  
+  1. 存在max_batch_size时，会自动在最前面补一个-1维度，例如dims填[32, 4]会自动填充为[-1, 32, 4]
+  2. reshape参数是为了应对dims为0维度，即只有batch size维度的情形，dims填写[ 1 ]并使用reshape: { shape: [ ] }
+  3. shape tensors参数表示dims为shape tensors时，triton认定dims的第一维的值为batch size，将不进行自动填充；
 
 ## 为什么快？
 ### FP16/INT8 推理
@@ -104,5 +106,3 @@ https://github.com/NVIDIA/TensorRT/tree/master/samples/python/uff_custom_plugin
 如果模型的输出是一个长向量，此时的json在反序列化时的并发性能是很差的。  
 因此可以强制使triton返回二进制格式的向量, 直接对json数据做固定字节数的截断进行强制解析，同时不影响剩余json部分的解析。 
 如果输出的向量数据仍然太大，可以在下游添加残差网络进行降维。
-
-
