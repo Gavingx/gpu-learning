@@ -14,6 +14,7 @@ services:
       ROOT_PASS: "123456"
       NOTEBOOK_PASS: "123456"
       NOTEBOOK_USER: "aigroup"
+    restart: always
     tty: true
     command: bash
     deploy:
@@ -37,6 +38,7 @@ services:
       ROOT_PASS: "123456"
       NOTEBOOK_PASS: "123456"
       NOTEBOOK_USER: "aigroup"
+    restart: always
     tty: true
     command: bash
     deploy:
@@ -59,6 +61,7 @@ services:
     environment:
       ROOT_PASS: "123456"
       NVIDIA_VISIBLE_DEVICES: "all"
+    restart: always
     deploy:
       resources:
         reservations:
@@ -85,6 +88,7 @@ services:
     environment:
       ROOT_PASS: "123456"
       NVIDIA_VISIBLE_DEVICES: "all"
+    restart: always
     deploy:
       resources:
         reservations:
@@ -105,6 +109,7 @@ services:
       ROOT_PASS: "123456"
       NOTEBOOK_PASS: "123456"
       NOTEBOOK_USER: "aigroup"
+    restart: always
     tty: true
     command: tensorboard --logdir=/root/aigroup/models
     deploy:
