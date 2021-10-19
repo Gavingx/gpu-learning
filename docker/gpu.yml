@@ -5,8 +5,8 @@ services:
     image: aigroup:tensorflow-21.09
     hostname: tensorflow
     ports:
-      - "8888:8888"
-      - "1234:22"
+      - "0.0.0.0:8888:8888"
+      - "0.0.0.0:1234:22"
     volumes:
       - "/data/aigroup:/root/aigroup"
       - "/etc/localtime:/etc/localtime"
@@ -29,8 +29,8 @@ services:
     image: aigroup:pytorch-21.09
     hostname: pytorch
     ports:
-      - "18888:8888"
-      - "11234:22"
+      - "0.0.0.0:18888:8888"
+      - "0.0.0.0:11234:22"
     volumes:
       - "/data/aigroup:/root/aigroup"
       - "/etc/localtime:/etc/localtime"
@@ -53,8 +53,8 @@ services:
     image: aigroup:tensorrt-8.0.3
     hostname: tensorrt
     ports:
-      - "10001:22"
-      - "10088:8888"
+      - "0.0.0.0:10001:22"
+      - "0.0.0.0:10088:8888"
     volumes:
       - "/data/aigroup:/root/aigroup"
       - "/etc/localtime:/etc/localtime"
@@ -78,10 +78,10 @@ services:
     shm_size: "10gb"
     hostname: triton_server
     ports:
-      - "10002:22"
-      - "8000:8000"
-      - "8001:8001"
-      - "8002:8002"
+      - "0.0.0.0:10002:22"
+      - "0.0.0.0:8000:8000"
+      - "0.0.0.0:8001:8001"
+      - "0.0.0.0:8002:8002"
     volumes:
       - "/data/aigroup:/root/aigroup"
       - "/etc/localtime:/etc/localtime"
@@ -101,7 +101,7 @@ services:
     image: aigroup:tensorflow-21.09
     hostname: tensorboard
     ports:
-      - "6006:6006"
+      - "0.0.0.0:6006:6006"
     volumes:
       - "/data/aigroup:/root/aigroup"
       - "/etc/localtime:/etc/localtime"
