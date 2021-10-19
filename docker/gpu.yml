@@ -15,8 +15,6 @@ services:
       NOTEBOOK_PASS: "123456"
       NOTEBOOK_USER: "aigroup"
     restart: always
-    tty: true
-    command: bash
     deploy:
       resources:
         reservations:
@@ -39,8 +37,6 @@ services:
       NOTEBOOK_PASS: "123456"
       NOTEBOOK_USER: "aigroup"
     restart: always
-    tty: true
-    command: bash
     deploy:
       resources:
         reservations:
