@@ -112,4 +112,4 @@ venv.bak/
 
 # data
 **/dll/
-**/pretrain_models
+**/pretrain-models
