@@ -11,6 +11,7 @@
 > - 查看宿主机GPU环境版本:  
   `cat /usr/local/cuda/version.json`
 
+
 ## 编译
 - 进入tensorrt容器  
 `docker exec -it tensorrt bash`
@@ -25,6 +26,7 @@
 > 如果没有/workspace/TensorRT目录, 可以手动拉取  
 > `cd /workspace && git clone -b master https://github.com/nvidia/TensorRT TensorRT`  
 > `cd TensorRT && git submodule update --init --recursive`
+
 
 ## 构建BERT engine
 以 [bert-base-chinese](https://huggingface.co/bert-base-chinese) 预训练模型的池化层输出为例：  
@@ -66,10 +68,12 @@
 > - 自定义插件生效必须指定`LD_PRELOAD`, 否则默认使用`/usr/lib/x86_64-linux-gnu/libnvinfer_plugin.so`
 > - 不同型号的卡导出engine时需要在相同的软硬件条件下重新编译对应的动态链接库，且导出engine时也需要在相应的硬件条件下(否则triton会报compute version错误)  
 
+
 ## 参考资料  
 - [TensorRT的数据格式](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#data-format-desc)  
 - [Enabling Fusion](https://docs.nvidia.com/deeplearning/tensorrt/best-practices/index.html#enable-fusion)  
 - [Softmax, TopK等layer指定轴向时需要输入bitmap型数值](https://docs.nvidia.com/deeplearning/tensorrt/api/c_api/classnvinfer1_1_1_i_soft_max_layer.html#a866ec69eb976e965b1c5c9f75ede189c) ，如 1>> 1 表示 0010
+
 
 ## FAQ  
 - 如何估计Triton的显存占用  
@@ -90,6 +94,7 @@ https://github.com/NVIDIA/TensorRT/tree/master/samples/python/uff_custom_plugin
   1. 存在max_batch_size时，会自动在最前面补一个-1维度，例如dims填[32, 4]会自动填充为[-1, 32, 4]
   2. reshape参数是为了应对dims为0维度，即只有batch size维度的情形，dims填写[ 1 ]并使用reshape: { shape: [ ] }
   3. shape tensors参数表示dims为shape tensors时，triton认定dims的第一维的值为batch size，将不进行自动填充；
+
 
 ## 为什么快？
 ### FP16/INT8 推理
