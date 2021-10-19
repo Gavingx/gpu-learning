@@ -111,3 +111,8 @@ https://github.com/NVIDIA/TensorRT/tree/master/samples/python/uff_custom_plugin
 如果模型的输出是一个长向量，此时的json在反序列化时的并发性能是很差的。  
 因此可以强制使triton返回二进制格式的向量, 直接对json数据做固定字节数的截断进行强制解析，同时不影响剩余json部分的解析。 
 如果输出的向量数据仍然太大，可以在下游添加残差网络进行降维。
+
+
+## 参考资料
+- [运算强度和IO强度](https://www.coursehero.com/file/48346906/s9926-tensor-core-performance-the-ultimate-guidepdf/)
+
