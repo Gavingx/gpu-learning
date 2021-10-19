@@ -7,7 +7,7 @@
 
 > TIPS  
 > - 查看TensorRT版本:   
-  `nm -D /usr/lib/x86_64-linux-gnu/libnvinfer.so.7 | grep tensorrt_version`
+  `nm -D /usr/lib/x86_64-linux-gnu/libnvinfer.so.8 | grep tensorrt_version`
 > - 查看宿主机GPU环境版本:  
   `cat /usr/local/cuda/version.json`
 
