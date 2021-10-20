@@ -102,10 +102,11 @@ def attention_layer_opt(prefix, config, init_dict, network, input_tensor, imask)
     """
     Add the attention layer
     """
-    assert (len(input_tensor.shape) == 5)
-    B, S, hidden_size, _, _ = input_tensor.shape
+    dims = input_tensor.shape  # [seq_len, batch_size, hidden_size, 1, 1]
+    assert len(dims) == 5
+    hidden_size = dims[2]
     num_heads = config.num_attention_heads
-    head_size = int(hidden_size / num_heads)
+    # head_size = int(hidden_size / num_heads)
 
     Wall = init_dict[prefix + WQKV]
     Ball = init_dict[prefix + BQKV]
@@ -333,6 +334,7 @@ def bert_model(config, init_dict, network, input_tensor, input_mask):
         ss = "l{}_".format(layer)
         out_layer = transformer_layer_opt(ss, config, init_dict, network, prev_input, input_mask)
         prev_input = out_layer.get_output(0)
+        set_tensor_name(prev_input, "l{}_".format(layer), "transformer_output")
 
     if config.use_qat:
         dr_out = init_dict["bert_encoder_final_input_quantizer_amax"]
@@ -340,7 +342,12 @@ def bert_model(config, init_dict, network, input_tensor, input_mask):
     return prev_input
 
 
-def get_cls_emb(network, input_tensor):
+def get_single_token(network, input_tensor, index=0):
+    """
+    获取单个token的切片值, 默认取CLS token
+
+    """
+
     dims = input_tensor.shape
     assert len(dims) == 5
     hidden_size = dims[2]
@@ -353,7 +360,7 @@ def get_cls_emb(network, input_tensor):
     inv_mask = network.add_constant(shape=(5,), weights=np.array([1, 0, 0, 0, 0], dtype=np.int32)).get_output(0)
     hidden_size_constant = network.add_constant(
         shape=(5,), weights=np.array([1, 0, 0, 0, 0], dtype=np.int32)).get_output(0)
-    start_tensor = network.add_constant(shape=(5,), weights=np.array([0, 0, 0, 0, 0], dtype=np.int32)).get_output(0)
+    start_tensor = network.add_constant(shape=(5,), weights=np.array([index, 0, 0, 0, 0], dtype=np.int32)).get_output(0)
 
     # (0, real_batch_size, hidden_size, 1, 1) + (1, 0, 0, 0, 0) = (1, real_batch_size, hidden_size, 1, 1)
     slice_tensor = network.add_elementwise(
@@ -366,7 +373,7 @@ def get_cls_emb(network, input_tensor):
     # 切片结果为 [6, 2, 9]
     slice_layer = network.add_slice(
         input_tensor,
-        start=(0, 0, 0, 0, 0),  # 每个维度的切片的起始索引
+        start=(index, 0, 0, 0, 0),  # 每个维度的切片的起始索引
         shape=(1, batch_size, hidden_size, 1, 1),  # 每个维度的切片长度, 这里的batch_size=-1
         stride=(1, 1, 1, 1, 1))  # 每个维度切片的步进
     slice_layer.set_input(0, input_tensor)
@@ -391,7 +398,7 @@ def cls_pooled_output(prefix, config, init_dict, network, input_tensor):
     hidden_size = idims[2]
 
     # 获取CLS Token
-    reduce_layer = get_cls_emb(network, input_tensor)
+    reduce_layer = get_single_token(network, input_tensor, index=0)
     reduce_layer.name = prefix + "reduce_layer"
     reduce_output = reduce_layer.get_output(0)
 
@@ -423,16 +430,17 @@ def ner_output(prefix, config, init_dict, network, input_tensor):
     batch_size = idims[1]  # value is -1
     hidden_size = idims[2]
 
-    # hidden_size -> label_counts 的全连接层
-    ner_w = init_dict["output_weights"]
-    ner_b = init_dict["output_bias"]
-
+    # 转为4维张量
     reshape_layer = network.add_shuffle(input_tensor)
     reshape_layer.second_transpose = (1, 0) # [batch_size, seq_len, hidden_size, 1, 1]
     reshape_layer.reshape_dims = trt.Dims([-1, hidden_size, 1, 1]) # [batch_size*seq_len, hidden_size, 1, 1]
     reshape_layer.name = prefix + "reshape_layer"
     reshape_layer_output = reshape_layer.get_output(0)
     set_tensor_name(reshape_layer_output, prefix, "reshape_layer_output")
+    network.add_shuffle
+    # hidden_size -> label_counts 的全连接层
+    ner_w = init_dict["output_weights"]
+    ner_b = init_dict["output_bias"]
 
     #
 
