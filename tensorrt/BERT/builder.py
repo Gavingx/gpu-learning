@@ -2,7 +2,6 @@
 
 """
 
-
 import argparse
 import ctypes
 import json
@@ -207,6 +206,38 @@ def custom_fc(config, network, input_tensor, out_dims, W):
     return out_dense
 
 
+# GELU Function
+def gelu_fc(prefix, config, init_dict, network, input_tensor):
+    POW = network.add_constant((1, 1, 1, 1), trt.Weights(np.ascontiguousarray([3.0], dtype=np.float32)))
+    MULTIPLY = network.add_constant((1, 1, 1, 1), trt.Weights(np.ascontiguousarray([0.044715], dtype=np.float32)))
+    SQRT = network.add_constant((1, 1, 1, 1), trt.Weights(
+        (np.ascontiguousarray([0.79788456080286535587989211986876], dtype=np.float32))))
+    ONE = network.add_constant((1, 1, 1, 1), trt.Weights((np.ascontiguousarray([1.0], dtype=np.float32))))
+    HALF = network.add_constant((1, 1, 1, 1), trt.Weights((np.ascontiguousarray([0.5], dtype=np.float32))))
+    X_pow = network.add_elementwise(input_tensor, POW.get_output(0), trt.ElementWiseOperation.POW)
+    X_pow_t = X_pow.get_output(0)
+    X_mul = network.add_elementwise(X_pow_t, MULTIPLY.get_output(0), trt.ElementWiseOperation.PROD)
+    X_add = network.add_elementwise(input_tensor, X_mul.get_output(0), trt.ElementWiseOperation.SUM)
+    X_sqrt = network.add_elementwise(X_add.get_output(0), SQRT.get_output(0), trt.ElementWiseOperation.PROD)
+    X_sqrt_tensor = X_sqrt.get_output(0)
+    X_tanh = network.add_activation(X_sqrt_tensor, trt.ActivationType.TANH)
+    X_tanh_tensor = X_tanh.get_output(0)
+    X_one = network.add_elementwise(X_tanh_tensor, ONE.get_output(0), trt.ElementWiseOperation.SUM)
+    CDF = network.add_elementwise(X_one.get_output(0), HALF.get_output(0), trt.ElementWiseOperation.PROD)
+    gelu_layer = network.add_elementwise(CDF.get_output(0), input_tensor, trt.ElementWiseOperation.PROD)
+
+    intermediate_act = gelu_layer.get_output(0)
+    set_tensor_name(intermediate_act, prefix, "gelu")
+    if config.use_int8:
+        if config.use_qat:
+            dr_gelu = init_dict[prefix + 'output_dense_input_amax']
+            set_output_range(gelu_layer, dr_gelu)
+        else:
+            # use gelu10 according to whitepaper http://arxiv.org/abs/2004.09602
+            set_output_range(gelu_layer, 10)
+    return gelu_layer
+
+
 def transformer_layer_opt(prefix, config, init_dict, network, input_tensor, imask):
     """
     Add the transformer layer
@@ -261,33 +292,7 @@ def transformer_layer_opt(prefix, config, init_dict, network, input_tensor, imas
         mid_dense = network.add_fully_connected(attention_ln, config.intermediate_size, W_mid, B_mid)
 
     mid_dense_out = mid_dense.get_output(0)
-    POW = network.add_constant((1, 1, 1, 1, 1), trt.Weights(np.ascontiguousarray([3.0], dtype=np.float32)))
-    MULTIPLY = network.add_constant((1, 1, 1, 1, 1), trt.Weights(np.ascontiguousarray([0.044715], dtype=np.float32)))
-    SQRT = network.add_constant((1, 1, 1, 1, 1), trt.Weights(
-        (np.ascontiguousarray([0.79788456080286535587989211986876], dtype=np.float32))))
-    ONE = network.add_constant((1, 1, 1, 1, 1), trt.Weights((np.ascontiguousarray([1.0], dtype=np.float32))))
-    HALF = network.add_constant((1, 1, 1, 1, 1), trt.Weights((np.ascontiguousarray([0.5], dtype=np.float32))))
-    X_pow = network.add_elementwise(mid_dense_out, POW.get_output(0), trt.ElementWiseOperation.POW)
-    X_pow_t = X_pow.get_output(0)
-    X_mul = network.add_elementwise(X_pow_t, MULTIPLY.get_output(0), trt.ElementWiseOperation.PROD)
-    X_add = network.add_elementwise(mid_dense_out, X_mul.get_output(0), trt.ElementWiseOperation.SUM)
-    X_sqrt = network.add_elementwise(X_add.get_output(0), SQRT.get_output(0), trt.ElementWiseOperation.PROD)
-    X_sqrt_tensor = X_sqrt.get_output(0)
-    X_tanh = network.add_activation(X_sqrt_tensor, trt.ActivationType.TANH)
-    X_tanh_tensor = X_tanh.get_output(0)
-    X_one = network.add_elementwise(X_tanh_tensor, ONE.get_output(0), trt.ElementWiseOperation.SUM)
-    CDF = network.add_elementwise(X_one.get_output(0), HALF.get_output(0), trt.ElementWiseOperation.PROD)
-    gelu_layer = network.add_elementwise(CDF.get_output(0), mid_dense_out, trt.ElementWiseOperation.PROD)
-
-    intermediate_act = gelu_layer.get_output(0)
-    set_tensor_name(intermediate_act, prefix, "gelu")
-    if config.use_int8:
-        if config.use_qat:
-            dr_gelu = init_dict[prefix + 'output_dense_input_amax']
-            set_output_range(gelu_layer, dr_gelu)
-        else:
-            # use gelu10 according to whitepaper http://arxiv.org/abs/2004.09602
-            set_output_range(gelu_layer, 10)
+    intermediate_act = gelu_fc(prefix, config, init_dict, network, mid_dense_out)
 
     # FC2
     # Dense to hidden size
@@ -373,19 +378,21 @@ def get_cls_emb(network, input_tensor):
     return reduce_layer
 
 
-def downstream_output(prefix, config, init_dict, network, input_tensor):
+def cls_pooled_output(prefix, config, init_dict, network, input_tensor):
     """
-    Create the downstream output
+    Create the cls_pooled output
+
+    CLS Token的池化层输出
+
     """
 
-    idims = input_tensor.shape
+    idims = input_tensor.shape  # [seq_len, batch_size , hidden_size, 1, 1]
     assert len(idims) == 5
     hidden_size = idims[2]
-    batch_size = idims[1]
 
     # 获取CLS Token
     reduce_layer = get_cls_emb(network, input_tensor)
-    reduce_layer.name = "Reduce Layer"
+    reduce_layer.name = prefix + "reduce_layer"
     reduce_output = reduce_layer.get_output(0)
 
     # CLS Token的池化层输出
@@ -397,9 +404,37 @@ def downstream_output(prefix, config, init_dict, network, input_tensor):
         pool_layer = network.add_convolution(reduce_output, hidden_size, (1, 1), p_w, p_b)
     else:
         pool_layer = network.add_fully_connected(reduce_output, hidden_size, p_w, p_b)
-    pool_layer.name = "Pool Layer"
+    pool_layer.name = prefix + "pool_layer"
     return pool_layer
 
+
+def ner_output(prefix, config, init_dict, network, input_tensor):
+    """
+    Create the Named-entity recognition output
+
+    命名实体识别任务的输出
+
+    """
+
+    idims = input_tensor.shape # [seq_len, batch_size , hidden_size, 1, 1]
+    assert len(idims) == 5
+
+    sequence_lengths = idims[0]
+    batch_size = idims[1]  # value is -1
+    hidden_size = idims[2]
+
+    # hidden_size -> label_counts 的全连接层
+    ner_w = init_dict["output_weights"]
+    ner_b = init_dict["output_bias"]
+
+    reshape_layer = network.add_shuffle(input_tensor)
+    reshape_layer.second_transpose = (1, 0) # [batch_size, seq_len, hidden_size, 1, 1]
+    reshape_layer.reshape_dims = trt.Dims([-1, hidden_size, 1, 1]) # [batch_size*seq_len, hidden_size, 1, 1]
+    reshape_layer.name = prefix + "reshape_layer"
+    reshape_layer_output = reshape_layer.get_output(0)
+    set_tensor_name(reshape_layer_output, prefix, "reshape_layer_output")
+
+    #
 
 def emb_layernorm(builder, network, config, weights_dict, builder_config, sequence_lengths, batch_sizes):
     # int8 only support some of the sequence length, we dynamic on sequence length is not allowed.
@@ -531,7 +566,7 @@ def build_engine(batch_sizes, workspace_size, sequence_lengths, config, weights_
 
         bert_out = bert_model(config, weights_dict, network, embeddings, mask_idx)
 
-        last_layer = downstream_output("cls_", config, weights_dict, network, bert_out)
+        last_layer = cls_pooled_output("cls_", config, weights_dict, network, bert_out)
         last_output = last_layer.get_output(0)
         last_output.name = "pooled_embedding"
         network.mark_output(last_output)
