@@ -71,8 +71,8 @@
 
 ## 参考资料  
 - [TensorRT的数据格式](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#data-format-desc)  
-- [Enabling Fusion](https://docs.nvidia.com/deeplearning/tensorrt/best-practices/index.html#enable-fusion)
-
+- [Enabling Fusion](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#enable-fusion)
+- [Layer API文档](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#layers)
 
 ## FAQ  
 - **如何估计Triton的显存占用**    
@@ -99,6 +99,76 @@ https://github.com/NVIDIA/TensorRT/tree/master/samples/python/uff_custom_plugin
   对于Softmax, TopK等算子在指定轴向时需要输入bitmap型数值，例如:  
   对`shape=[batch_size, sequence_length, hidden_size, 1, 1]`的张量在`sequence_length`维度做softmax,   
   指定的`axis = 1<<2`，`1<<2`表示从`0001`位移成`0100`
+
+## TensorRT的算子API
+- [IConvolutionLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#convolution-layer) 卷积层算子    
+  2D卷积对应NCHW张量, 四维以上的并入batch_size维度  
+  3D卷积对应NCDHW张量, 五维以上的并入batch_size维度  
+
+
+- [IEinsumLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#einsum-layer) 爱因斯坦求和算子  
+  参考numpy的[einsum函数](https://numpy.org/doc/stable/reference/generated/numpy.einsum.html)  
+
+
+- [IFullyConnectedLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#fullyconnected-layer) 全连接层算子  
+  至少为3维张量, 最后三个维度会合并为一个维度, 剩余维度相当于都是batch_size维度进行广播。  
+  输出张量会在最后补两个维度(1, 1)使输入和输出张量的shape保持一致
+  
+
+- [IGatherLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#gather-layer)  切片提取算子  
+  IGatherLayer的类型类似于[Onnx中的分类](https://github.com/onnx/onnx/blob/master/docs/Operators.md#gather)    
+  ![1.png](images/1.png)  
+  
+  - 默认gather模式 `rank(output) = (rank(input) - 1) + rank(index)`
+  - `GatherElements Mode` 参考pytorch的[gather函数](https://pytorch.org/docs/stable/generated/torch.gather.html) , 
+    `rank(input)=rank(index), shape(output)=shape(index)`
+  - `GatherND Mode` `rank(output) = rank(input) + rank(index) - index_shape[-1] - (b+1)`
+  
+
+- [IMatrixMultiplyLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#matrixmultiply-layer)  
+  参考numpy的[matmul函数](https://numpy.org/doc/stable/reference/generated/numpy.matmul.html) ,
+  除去最后两个维度剩余维度的shape要保持一致
+
+
+- [IPoolingLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#pooling-layer)  
+  要求`rank(input) >= rank(kernel) + 1`, 对于2D-pooling最后两个维度看作H和W, 对于3D-pooling最后三个维度看作DHW
+
+
+- [IRaggedSoftMaxLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#raggedsoftmax-layer)  
+  不同长度的序列的softmax  
+
+
+- [IReduceLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#reduce-layer)  
+  Reduce操作包括`max, min, product, sum, and average`, 可选择保留输入张量的rank
+
+
+- [IResizeLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#resize-layer)  
+  参考ONNX的[resize算子](https://github.com/onnx/onnx/blob/master/docs/Operators.md#resize)
+
+
+- [IRNNv2Layer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#rnnv2-layer)  
+  RNN算子支持LSTM和GRU
+
+
+- [IShapeLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#select-layer)  
+  返回输入张量的shape(张量格式)
+
+
+- [IShuffleLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#shuffle-layer)  
+  包含`transpose + reshape + second transpose`三个算子, 三个算子的默认值均不改变张量。 
+
+
+- [ISliceLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#slice-layer)  
+  取张量的切片, 需要在每个维度设置起始点, 步进和切片长度
+
+
+- [ISoftMaxLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#softmax-layer)  
+  Softmax算子, [指定轴向需要使用bitmap](https://docs.nvidia.com/deeplearning/tensorrt/api/c_api/classnvinfer1_1_1_i_soft_max_layer.html#a866ec69eb976e965b1c5c9f75ede189c)  
+
+
+- [ITopKLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#topk-layer)  
+  取某个轴向的TopK数值, 指定轴向需要使用bitmap
+
 
 ## 为什么快？
 ### FP16/INT8 推理

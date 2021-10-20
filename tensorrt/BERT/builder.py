@@ -437,7 +437,7 @@ def ner_output(prefix, config, init_dict, network, input_tensor):
     reshape_layer.name = prefix + "reshape_layer"
     reshape_layer_output = reshape_layer.get_output(0)
     set_tensor_name(reshape_layer_output, prefix, "reshape_layer_output")
-    network.add_shuffle
+
     # hidden_size -> label_counts 的全连接层
     ner_w = init_dict["output_weights"]
     ner_b = init_dict["output_bias"]
