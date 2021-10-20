@@ -38,3 +38,10 @@
 > - Tensorboard容器
 
 
+## TODO
+- [ ] 支持 [TVM](https://github.com/apache/tvm) 
+- [ ] 支持 [DeepSpeed](https://github.com/microsoft/DeepSpeed)
+- [ ] 支持 [Megatron](https://github.com/NVIDIA/Megatron-LM)
+
+
+

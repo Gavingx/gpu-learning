@@ -23,8 +23,8 @@
 - 将so文件放在项目的`gpu-learning/tensorrt/BERT/dll/`目录下  
   以GTX1050显卡为例, 重命名为`libnvinfer_plugin_gtx1050.so`
 
-> 如果没有/workspace/TensorRT目录, 可以手动拉取  
-> `cd /workspace && git clone -b master https://github.com/nvidia/TensorRT TensorRT`  
+> 如果没有/workspace/TensorRT目录或者NVIDIA官方容器内的代码版本与TensorRT版本不一致, 可以手动拉取  
+> `cd /workspace && git clone -b release/8.0 https://github.com/nvidia/TensorRT TensorRT`  
 > `cd TensorRT && git submodule update --init --recursive`
 
 
