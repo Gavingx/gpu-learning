@@ -52,7 +52,7 @@
 - 切换时区
 
 
-- 安装`docker`
+- 安装`docker`  
 `curl -fsSL https://get.docker.com/ | sh && sudo service docker start && sudo systemctl enable docker.service && sudo usermod -aG docker $USER`
 
 
