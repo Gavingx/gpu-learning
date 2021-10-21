@@ -162,7 +162,7 @@ https://github.com/NVIDIA/TensorRT/tree/master/samples/python/uff_custom_plugin
   对`shape=[batch_size, sequence_length, hidden_size, 1, 1]`的张量在`hidden_size`维度做softmax,   
   指定`axis = 1<<2`，`1<<2`表示`bit2`
 
-> TIPS  
+> **TIPS**  
 > `bit x = power(2, x)`   
 > `axis=0` 对应的就是`axis=1<<0`  
 > `axis=1` 对应的就是`axis=1<<1`  
