@@ -62,18 +62,18 @@
 > 例子
 > ```
 > network:   
->    ethernets:
->        eth0:
->            dhcp4: true
->            optional: true
->    version: 2
->    wifis:
->        wifi_name:
->            dhcp4: true
->            optional: true
->            access-points:
->                "SSID_name":
->                    password: "WiFi_password"
+>   ethernets:
+>     eth0:
+>       dhcp4: true
+>       optional: true
+>   version: 2
+>   wifis:
+>     wifi_device_name:
+>       dhcp4: true
+>       optional: true
+>       access-points:
+>         wifi_ssid_name:
+>           password: "wifi_password"
 > ```
 >
 

@@ -342,77 +342,95 @@ def bert_model(config, init_dict, network, input_tensor, input_mask):
     return prev_input
 
 
-def get_single_token(network, input_tensor, index=0):
+def get_single_token(network, input_tensor, index=0, enable_gather=True):
     """
     获取单个token的切片值, 默认取CLS token
 
     """
-
     dims = input_tensor.shape
     assert len(dims) == 5
     hidden_size = dims[2]
     batch_size = dims[1]  # value is -1
-    # shape layer
-    # shape层可以拿到真实的batch_size
-    shape = network.add_shape(input_tensor).get_output(0)
-    # slice [CLS] token
-    mask = network.add_constant(shape=(5,), weights=np.array([0, 1, 1, 1, 1], dtype=np.int32)).get_output(0)
-    inv_mask = network.add_constant(shape=(5,), weights=np.array([1, 0, 0, 0, 0], dtype=np.int32)).get_output(0)
-    hidden_size_constant = network.add_constant(
-        shape=(5,), weights=np.array([1, 0, 0, 0, 0], dtype=np.int32)).get_output(0)
-    start_tensor = network.add_constant(shape=(5,), weights=np.array([index, 0, 0, 0, 0], dtype=np.int32)).get_output(0)
 
-    # (0, real_batch_size, hidden_size, 1, 1) + (1, 0, 0, 0, 0) = (1, real_batch_size, hidden_size, 1, 1)
-    slice_tensor = network.add_elementwise(
-        network.add_elementwise(shape, mask, trt.ElementWiseOperation.PROD).get_output(0),
-        network.add_elementwise(hidden_size_constant, inv_mask, trt.ElementWiseOperation.PROD).get_output(0),
-        trt.ElementWiseOperation.SUM).get_output(0)
+    if enable_gather:
+        # 使用add_gather算子实现切片
+        indices_tensor = network.add_constant(shape=(1,), weights=np.array([index], dtype=np.int32))
+        gather_layer = network.add_gather(input=input_tensor, indices=indices_tensor, axis=1)
+        gather_layer.name = "gather_layer"
+        slice_output = gather_layer.get_output(0)
+    else:
+        # 使用add_slice算子完成切片
+        # shape layer
+        # shape层可以拿到真实的batch_size
+        shape = network.add_shape(input_tensor).get_output(0)
+        # slice [CLS] token
+        mask = network.add_constant(shape=(5,), weights=np.array([0, 1, 1, 1, 1], dtype=np.int32)).get_output(0)
+        inv_mask = network.add_constant(shape=(5,), weights=np.array([1, 0, 0, 0, 0], dtype=np.int32)).get_output(0)
+        hidden_size_constant = network.add_constant(
+            shape=(5,), weights=np.array([1, 0, 0, 0, 0], dtype=np.int32)).get_output(0)
+        start_tensor = network.add_constant(shape=(5,),
+                                            weights=np.array([index, 0, 0, 0, 0], dtype=np.int32)).get_output(0)
 
-    # example: [3, 6, 7, 2, 1, 9]
-    # 指定start=1, shape=3, stride=2
-    # 切片结果为 [6, 2, 9]
-    slice_layer = network.add_slice(
-        input_tensor,
-        start=(index, 0, 0, 0, 0),  # 每个维度的切片的起始索引
-        shape=(1, batch_size, hidden_size, 1, 1),  # 每个维度的切片长度, 这里的batch_size=-1
-        stride=(1, 1, 1, 1, 1))  # 每个维度切片的步进
-    slice_layer.set_input(0, input_tensor)
-    slice_layer.set_input(1, start_tensor)
-    slice_layer.set_input(2, slice_tensor)
-    slice_output = slice_layer.get_output(0)
+        # (0, real_batch_size, hidden_size, 1, 1) + (1, 0, 0, 0, 0) = (1, real_batch_size, hidden_size, 1, 1)
+        slice_tensor = network.add_elementwise(
+            network.add_elementwise(shape, mask, trt.ElementWiseOperation.PROD).get_output(0),
+            network.add_elementwise(hidden_size_constant, inv_mask, trt.ElementWiseOperation.PROD).get_output(0),
+            trt.ElementWiseOperation.SUM).get_output(0)
+
+        # example: [3, 6, 7, 2, 1, 9]
+        # 指定start=1, shape=3, stride=2
+        # 切片结果为 [6, 2, 9]
+        slice_layer = network.add_slice(
+            input_tensor,
+            start=(index, 0, 0, 0, 0),  # 每个维度的切片的起始索引
+            shape=(1, batch_size, hidden_size, 1, 1),  # 每个维度的切片长度, 这里的batch_size=-1
+            stride=(1, 1, 1, 1, 1))  # 每个维度切片的步进
+        slice_layer.set_input(0, input_tensor)
+        slice_layer.set_input(1, start_tensor)
+        slice_layer.set_input(2, slice_tensor)
+        slice_output = slice_layer.get_output(0)
     reduce_layer = network.add_shuffle(slice_output)
     reduce_layer.reshape_dims = trt.Dims([-1, hidden_size, 1, 1])
     return reduce_layer
 
-
-def cls_pooled_output(prefix, config, init_dict, network, input_tensor):
+def get_transformer_pooling(network, input_tensor, layer_index=-1, mode="average"):
     """
-    Create the cls_pooled output
-
-    CLS Token的池化层输出
+    获取Transformer
 
     """
 
-    idims = input_tensor.shape  # [seq_len, batch_size , hidden_size, 1, 1]
+def pooling_output(prefix, config, init_dict, network, input_tensor, mode="cls"):
+    """
+    Create the pooling output
+
+    池化层输出, 包括CLS token, average pooling, max pooling三种模式
+
+    """
+
+    idims = input_tensor.shape  # [seq_len, batch_size, hidden_size, 1, 1]
     assert len(idims) == 5
     hidden_size = idims[2]
 
-    # 获取CLS Token
-    reduce_layer = get_single_token(network, input_tensor, index=0)
-    reduce_layer.name = prefix + "reduce_layer"
-    reduce_output = reduce_layer.get_output(0)
+    if mode == "cls":
+        # 获取CLS Token
+        cls_layer = get_single_token(network, input_tensor, index=0)
+        cls_layer.name = prefix + "cls_layer"
+        cls_output = cls_layer.get_output(0)
 
-    # CLS Token的池化层输出
-    p_w = init_dict["bert_pooler_dense_kernel"]
-    p_b = init_dict["bert_pooler_dense_bias"]
+        # CLS Token的池化层输出
+        p_w = init_dict["bert_pooler_dense_kernel"]
+        p_b = init_dict["bert_pooler_dense_bias"]
 
-    # pooler layer output
-    if config.use_int8:
-        pool_layer = network.add_convolution(reduce_output, hidden_size, (1, 1), p_w, p_b)
+        # pooler layer
+        # convolution层和activation层会自动进行kernel fusion
+        if config.use_int8:
+            pooler_dense_layer = network.add_convolution_nd(cls_output, hidden_size, (1, 1), p_w, p_b)
+        else:
+            pooler_dense_layer = network.add_fully_connected(cls_output, hidden_size, p_w, p_b)
+        pooler_layer = network.add_activation(pooler_dense_layer.get_output(0), trt.ActivationType.TANH)
     else:
-        pool_layer = network.add_fully_connected(reduce_output, hidden_size, p_w, p_b)
-    pool_layer.name = prefix + "pool_layer"
-    return pool_layer
+        pooler_layer = None
+    return pooler_layer
 
 
 def ner_output(prefix, config, init_dict, network, input_tensor):
@@ -423,26 +441,45 @@ def ner_output(prefix, config, init_dict, network, input_tensor):
 
     """
 
-    idims = input_tensor.shape # [seq_len, batch_size , hidden_size, 1, 1]
+    idims = input_tensor.shape  # [seq_len, batch_size, hidden_size, 1, 1]
     assert len(idims) == 5
 
     sequence_lengths = idims[0]
     batch_size = idims[1]  # value is -1
     hidden_size = idims[2]
 
-    # 转为4维张量
-    reshape_layer = network.add_shuffle(input_tensor)
-    reshape_layer.second_transpose = (1, 0) # [batch_size, seq_len, hidden_size, 1, 1]
-    reshape_layer.reshape_dims = trt.Dims([-1, hidden_size, 1, 1]) # [batch_size*seq_len, hidden_size, 1, 1]
-    reshape_layer.name = prefix + "reshape_layer"
-    reshape_layer_output = reshape_layer.get_output(0)
-    set_tensor_name(reshape_layer_output, prefix, "reshape_layer_output")
+    # 转置层
+    transpose_layer = network.add_shuffle(input_tensor)
+    transpose_layer.second_transpose = (1, 0)  # [batch_size, seq_len, hidden_size, 1, 1]
+    transpose_layer.name = prefix + "transpose_layer"
+    transpose_layer_output = transpose_layer.get_output(0)
+    set_tensor_name(transpose_layer_output, prefix, "transpose_layer_output")
 
     # hidden_size -> label_counts 的全连接层
     ner_w = init_dict["output_weights"]
     ner_b = init_dict["output_bias"]
 
-    #
+    if config.use_int8:
+        ner_layer = network.add_convolution_nd(input_tensor, config.label_counts, (1, 1), ner_w, ner_b)
+    else:
+        ner_layer = network.add_fully_connected(input_tensor, config.label_counts, ner_w, ner_b)
+
+    ner_layer.name = prefix + "dense_layer"
+    ner_layer_output = ner_layer.get_output(0)  # [batch_size, seq_len, label_counts, 1, 1]
+    set_tensor_name(ner_layer_output, prefix, "dense_layer_output")
+
+    # Softmax层
+    softmax_layer = network.add_softmax(ner_output)
+    softmax_layer.axes = 1 << 2
+    softmax_layer.name = prefix + "softmax_layer"
+    softmax_output = softmax_layer.get_output(0)
+    set_tensor_name(softmax_output, prefix, "softmax_output")
+
+    # TopK层, Softmax + TopK会自动进行kernel fusion
+    topk_layer = network.add_topk(input=softmax_output, op=trt.TopKOperation.MAX, k=1, axes=1 << 2)
+    topk_layer.name = prefix + "topk_layer"
+    return topk_layer
+
 
 def emb_layernorm(builder, network, config, weights_dict, builder_config, sequence_lengths, batch_sizes):
     # int8 only support some of the sequence length, we dynamic on sequence length is not allowed.
@@ -527,7 +564,8 @@ def emb_layernorm(builder, network, config, weights_dict, builder_config, sequen
 
 def build_engine(batch_sizes, workspace_size, sequence_lengths, config, weights_dict, squad_json, vocab_file,
                  calibrationCacheFile, calib_num):
-    explicit_batch_flag = 1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+    explicit_batch_flag = 1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)  ## this value is 1 << 0 = 1
+    print(f"explicit_batch_flag is {explicit_batch_flag}")
 
     with trt.Builder(TRT_LOGGER) as builder, builder.create_network(
             explicit_batch_flag) as network, builder.create_builder_config() as builder_config:

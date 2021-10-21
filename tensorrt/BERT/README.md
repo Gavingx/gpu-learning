@@ -132,7 +132,10 @@
 
 
 - [ISoftMaxLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#softmax-layer)  
-  Softmax算子, [指定轴向需要使用bitmap](https://docs.nvidia.com/deeplearning/tensorrt/api/c_api/classnvinfer1_1_1_i_soft_max_layer.html#a866ec69eb976e965b1c5c9f75ede189c)  
+  Softmax算子, [指定轴向需要使用bitmap](https://docs.nvidia.com/deeplearning/tensorrt/api/c_api/classnvinfer1_1_1_i_soft_max_layer.html#a866ec69eb976e965b1c5c9f75ede189c)   
+  `bit x = power(2, x)`   
+  `axis=0` 对应的就是`axis=1<<0`  
+  `axis=1` 对应的就是`axis=1<<1`  
 
 
 - [ITopKLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#topk-layer)  
