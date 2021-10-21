@@ -49,7 +49,8 @@
     4. 重启SSH服务：  
        `service sshd restart`
 
-- 切换时区
+- 切换时区  
+`export TZ="Asia/Shanghai" && ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone`
 
 
 - 安装`docker`  
