@@ -48,7 +48,7 @@
 > -c: bert config文件所在目录  
 
 > **TIPS**  
-> 修改`TRT_LOGGER = trt.Logger(trt.Logger.VERBOSE)` 且使用重定向`python3 builder.py xxx 2>x.log`可以记录构建的详细日志  
+> 修改`TRT_LOGGER = trt.Logger(trt.Logger.VERBOSE)` 且使用重定向`python3 builder.py xxx 2>x.log`可以记录构建的详细日志(重定向前没有`2`不会写入VERBOSE信息)  
 
 
 ## 启动Triton服务  
