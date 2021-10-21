@@ -48,9 +48,9 @@
 > -c: bert config文件所在目录  
 
 > **TIPS**  
-> 修改`TRT_LOGGER = trt.Logger(trt.Logger.VERBOSE)` 且使用重定向`python3 builder.py xxx 2>x.log`可以记录构建的详细日志(重定向前没有`2`不会写入VERBOSE信息)   
-> 详细信息中可以看到优化策略的搜索过程和算子融合的过程  
-> 算子融合的可视化可以使用[NVIDIA NSIGHT SYSTEM](https://developer.nvidia.com/nsight-systems)
+> - 修改`TRT_LOGGER = trt.Logger(trt.Logger.VERBOSE)` 且使用重定向`python3 builder.py xxx 2>x.log`可以记录构建的详细日志(重定向前没有`2`不会写入VERBOSE信息)   
+> - 详细信息中可以看到优化策略的搜索过程和算子融合的过程  
+> - 算子融合的可视化可以使用[NVIDIA NSIGHT SYSTEM](https://developer.nvidia.com/nsight-systems)
 
 
 ## 启动Triton服务  
