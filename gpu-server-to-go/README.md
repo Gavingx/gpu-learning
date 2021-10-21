@@ -51,6 +51,27 @@
 
 - 切换时区
 
+
+- 安装`docker`
+`curl -fsSL https://get.docker.com/ | sh && sudo service docker start && sudo systemctl enable docker.service && sudo usermod -aG docker $USER`
+
+
+- 安装`docker-compose`  
+`sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose \
+&& sudo chmod +x /usr/local/bin/docker-compose \
+&& sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose`  
+或者`apt install docker-compose`(版本稍旧)
+
+
+- 安装`nvidia-docker`  
+`distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
+&& curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add - \
+&& curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list \
+&& sudo apt-get update && sudo apt-get install -y nvidia-docker2
+&& sudo systemctl restart docker`
+
+
+
 ## 注意事项
 ### 使用不同电脑时网络往往需要重新设置
 1. 查看网络连接的名称  
