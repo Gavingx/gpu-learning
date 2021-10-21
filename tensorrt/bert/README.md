@@ -161,8 +161,8 @@ https://github.com/NVIDIA/TensorRT/tree/master/samples/python/uff_custom_plugin
 
 - **如何设置算子的操作轴向**  
   对于Softmax, TopK等算子在指定轴向时需要输入bitmap型数值，例如:  
-  对`shape=[batch_size, sequence_length, hidden_size, 1, 1]`的张量在`sequence_length`维度做softmax,   
-  指定的`axis = 1<<2`，`1<<2`表示从`0001`位移成`0100`
+  对`shape=[batch_size, sequence_length, hidden_size, 1, 1]`的张量在`hidden_size`维度做softmax,   
+  指定的`axis = 1<<2`，`1<<2`表示`axis_index=2`
 
 
 
