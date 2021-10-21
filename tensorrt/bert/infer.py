@@ -62,7 +62,7 @@ def format_input(input_str, tokenizer, max_seq_length, engine_mode=True, enable_
                 }],
             "outputs": [
                 {
-                    "name": "pooled_embedding",
+                    "name": "output",
                     "parameters": {
                         "binary_data": True
                     }

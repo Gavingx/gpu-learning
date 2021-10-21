@@ -35,7 +35,7 @@
 `python3 builder.py -m $PRETRAIN_DIR/bert_model.ckpt -o engine_file/bert-base-chinese/1/model.plan 
  -s 16 -g -b 1 -b 2 --fp16 -w 1800 -c $PRETRAIN_DIR`
 
-> 参数解释：   
+> **参数解释**     
 > [GPU_MODEL](https://github.com/xiangyangkan/gpu-learning/blob/main/tensorrt/BERT/builder.py#L37): 用于指定使用哪个.so文件, 不同卡的.so文件的有区别的  
 > PRETRAIN_DIR: 预训练模型文件所在目录  
 > -m: 指定ckpt文件位置  
@@ -46,6 +46,9 @@
 > --fp16: 使用半精度推理  
 > -w: 构建时分配的显存大小, 在不爆显存的情况下越大越好  
 > -c: bert config文件所在目录  
+
+> **TIPS**  
+> 修改`TRT_LOGGER = trt.Logger(trt.Logger.VERBOSE)` 且使用重定向`python3 builder.py xxx 2>x.log`可以记录构建的详细日志  
 
 
 ## 启动Triton服务  
@@ -89,6 +92,15 @@
     `rank(input)=rank(index), shape(output)=shape(index)`
   - `GatherND Mode` `rank(output) = rank(input) + rank(index) - index_shape[-1] - (b+1)`
   
+> **注意**
+> - 默认gather模式需要指定`axis`和`num_elementwise_dims`, 这里的数值都取实际数字而不是bitmap数据。
+> - `num_elementwise_dims`取值为0或1, 取值为0时就是onnx中的Gather算子，取值为1时类似`implicit batch`模式(隐藏batch_size维度)，
+>   对于第一个维度默认为batch_size做广播, 广播方式类似于`GatherElements Mode`
+
+> **例子**
+> 假设`input_tensor`为`[4, 16, 768, 1, 1]`维度的张量, `indices_tensor`为`[3, 2]`维度的张量。  
+> 若取axis=2, num_elementwise_dims=0, 输出张量的维度为`[4, 16, 3, 2, 1, 1]`
+> 若取axis=2, num_elementwise_dims=1, 输出张量的维度为`[3, 16, 2, 1, 1]`
 
 - [IMatrixMultiplyLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#matrixmultiply-layer)  
   参考numpy的[matmul函数](https://numpy.org/doc/stable/reference/generated/numpy.matmul.html) ,

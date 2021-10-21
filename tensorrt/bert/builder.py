@@ -349,7 +349,7 @@ def get_single_token(network, input_tensor, index=0, enable_gather=True):
 
     if enable_gather:
         # 使用add_gather算子实现切片
-        indices_tensor = network.add_constant(shape=(1,), weights=np.array([index], dtype=np.int32))
+        indices_tensor = network.add_constant(shape=(1,), weights=np.array([index], dtype=np.int32)).get_output(0)
         gather_layer = network.add_gather(input=input_tensor, indices=indices_tensor, axis=0)
         gather_layer.num_elementwise_dims = 0
         gather_layer.name = "gather_layer"
@@ -390,7 +390,7 @@ def get_single_token(network, input_tensor, index=0, enable_gather=True):
     return reduce_layer
 
 
-def get_transformer_pooling(prefix, network, input_tensor, mode="average"):
+def get_transformer_pooling(network, input_tensor, mode="average"):
     """
     获取Transformer某层的池化输出, 池化类型包括average pooling和max pooling两种模式
 
@@ -405,11 +405,10 @@ def get_transformer_pooling(prefix, network, input_tensor, mode="average"):
         op = trt.ReduceOperation.MAX
 
     reduce_layer = network.add_reduce(input=input_tensor, op=op, axes=1 << 0, keep_dims=False)
-    reduce_layer.name = prefix + "reduce_layer"
     return reduce_layer
 
 
-def pooling_output(prefix, config, init_dict, network, input_tensor, mode="max"):
+def pooling_output(prefix, config, init_dict, network, input_tensor, mode="cls"):
     """
     Create the pooling output
 
@@ -424,7 +423,7 @@ def pooling_output(prefix, config, init_dict, network, input_tensor, mode="max")
     if mode == "cls":
         # 获取CLS Token
         cls_layer = get_single_token(network, input_tensor, index=0)
-        cls_layer.name = prefix + "cls_layer"
+        cls_layer.name = "cls_layer"
         cls_output = cls_layer.get_output(0)
 
         # CLS Token的池化层输出
@@ -439,7 +438,7 @@ def pooling_output(prefix, config, init_dict, network, input_tensor, mode="max")
             pooler_dense_layer = network.add_fully_connected(cls_output, hidden_size, p_w, p_b)
         pooler_layer = network.add_activation(pooler_dense_layer.get_output(0), trt.ActivationType.TANH)
     else:
-        pooler_layer = get_transformer_pooling(prefix, network, input_tensor, mode)
+        pooler_layer = get_transformer_pooling(network, input_tensor, mode)
     return pooler_layer
 
 
@@ -453,38 +452,45 @@ def ner_output(prefix, config, init_dict, network, input_tensor):
 
     idims = input_tensor.shape  # [seq_len, batch_size, hidden_size, 1, 1]
     assert len(idims) == 5
+    hidden_size = idims[2]
 
     # 转置层
     transpose_layer = network.add_shuffle(input_tensor)
-    transpose_layer.second_transpose = (1, 0)  # [batch_size, seq_len, hidden_size, 1, 1]
+    # 这里要填完整的排列, 填(1, 0)会异常
+    transpose_layer.second_transpose = (1, 0, 2, 3, 4)  # [batch_size, seq_len, hidden_size, 1, 1]
     transpose_layer.name = prefix + "transpose_layer"
     transpose_layer_output = transpose_layer.get_output(0)
     set_tensor_name(transpose_layer_output, prefix, "transpose_layer_output")
 
     # hidden_size -> label_counts 的全连接层
-    ner_w = init_dict["output_weights"]
-    ner_b = init_dict["output_bias"]
+    # ner_w = init_dict["output_weights"]
+    # ner_b = init_dict["output_bias"]
+
+    # example 随机一组数据作为测试
+    label_counts = 100
+    ner_w = trt.Weights(np.ascontiguousarray(np.random.rand(hidden_size, label_counts), dtype=np.float32))
+    ner_b = trt.Weights(np.ascontiguousarray(np.random.rand(label_counts), dtype=np.float32))
 
     if config.use_int8:
-        ner_layer = network.add_convolution_nd(input_tensor, config.label_counts, (1, 1), ner_w, ner_b)
+        ner_layer = network.add_convolution_nd(input_tensor, label_counts, (1, 1), ner_w, ner_b)
     else:
-        ner_layer = network.add_fully_connected(input_tensor, config.label_counts, ner_w, ner_b)
+        ner_layer = network.add_fully_connected(input_tensor, label_counts, ner_w, ner_b)
 
     ner_layer.name = prefix + "dense_layer"
     ner_layer_output = ner_layer.get_output(0)  # [batch_size, seq_len, label_counts, 1, 1]
     set_tensor_name(ner_layer_output, prefix, "dense_layer_output")
 
-    # Softmax层
-    softmax_layer = network.add_softmax(ner_output)
-    softmax_layer.axes = 1 << 2
-    softmax_layer.name = prefix + "softmax_layer"
-    softmax_output = softmax_layer.get_output(0)
-    set_tensor_name(softmax_output, prefix, "softmax_output")
-
-    # TopK层, Softmax + TopK会自动进行kernel fusion
-    topk_layer = network.add_topk(input=softmax_output, op=trt.TopKOperation.MAX, k=1, axes=1 << 2)
-    topk_layer.name = prefix + "topk_layer"
-    return topk_layer
+    # # Softmax层
+    # softmax_layer = network.add_softmax(ner_layer_output)
+    # softmax_layer.axes = 1 << 2
+    # softmax_layer.name = prefix + "softmax_layer"
+    # softmax_output = softmax_layer.get_output(0)
+    # set_tensor_name(softmax_output, prefix, "softmax_output")
+    #
+    # # TopK层, Softmax + TopK会自动进行kernel fusion
+    # topk_layer = network.add_topk(input=softmax_output, op=trt.TopKOperation.MAX, k=1, axes=1 << 2)
+    # topk_layer.name = prefix + "topk_layer"
+    return ner_layer
 
 
 def emb_layernorm(builder, network, config, weights_dict, builder_config, sequence_lengths, batch_sizes):
@@ -625,9 +631,10 @@ def build_engine(batch_sizes, workspace_size, sequence_lengths, config, weights_
             last_transformer_transpose_output.name = "last_transformer_output"
             network.mark_output(last_transformer_transpose_output)
 
-        last_layer = pooling_output("cls_", config, weights_dict, network, bert_out)
+        # last_layer = pooling_output("pooling_", config, weights_dict, network, bert_out)
+        last_layer = ner_output("ner_", config, weights_dict, network, bert_out)
         last_output = last_layer.get_output(0)
-        last_output.name = "pooled_embedding"
+        last_output.name = "output"
         network.mark_output(last_output)
 
         build_start_time = time.time()
