@@ -104,7 +104,7 @@
 
 
 - [IReduceLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#reduce-layer)  
-  Reduce操作包括`max, min, product, sum, and average`, 可选择保留输入张量的rank
+  Reduce操作包括`max, min, product, sum, and average`, 可选择保留输入张量的rank, 指定轴向使用bitmap
 
 
 - [IResizeLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#resize-layer)  
@@ -128,14 +128,12 @@
 
 
 - [ISoftMaxLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#softmax-layer)  
-  Softmax算子, [指定轴向需要使用bitmap](https://docs.nvidia.com/deeplearning/tensorrt/api/c_api/classnvinfer1_1_1_i_soft_max_layer.html#a866ec69eb976e965b1c5c9f75ede189c)   
-  `bit x = power(2, x)`   
-  `axis=0` 对应的就是`axis=1<<0`  
-  `axis=1` 对应的就是`axis=1<<1`  
+  Softmax算子, [指定轴向使用bitmap](https://docs.nvidia.com/deeplearning/tensorrt/api/c_api/classnvinfer1_1_1_i_soft_max_layer.html#a866ec69eb976e965b1c5c9f75ede189c)   
+
 
 
 - [ITopKLayer](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#topk-layer)  
-  取某个轴向的TopK数值, 指定轴向需要使用bitmap
+  取某个轴向的TopK数值, 指定轴向使用bitmap
 
 
 ## FAQ  
@@ -160,9 +158,14 @@ https://github.com/NVIDIA/TensorRT/tree/master/samples/python/uff_custom_plugin
   3. shape tensors参数表示dims为shape tensors时，triton认定dims的第一维的值为batch size，将不进行自动填充；
 
 - **如何设置算子的操作轴向**  
-  对于Softmax, TopK等算子在指定轴向时需要输入bitmap型数值，例如:  
+  对于Softmax, TopK, Reduce等算子在指定轴向时需要输入bitmap型数值，例如:  
   对`shape=[batch_size, sequence_length, hidden_size, 1, 1]`的张量在`hidden_size`维度做softmax,   
-  指定的`axis = 1<<2`，`1<<2`表示`axis_index=2`
+  指定`axis = 1<<2`，`1<<2`表示`bit2`
+
+> TIPS  
+> `bit x = power(2, x)`   
+> `axis=0` 对应的就是`axis=1<<0`  
+> `axis=1` 对应的就是`axis=1<<1`  
 
 
 

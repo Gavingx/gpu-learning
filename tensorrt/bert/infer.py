@@ -27,13 +27,14 @@ def input_tokenizer(input_str, tokenizer, max_seq_length):
     return input_ids, input_mask, segment_ids
 
 
-def format_input(input_str, tokenizer, max_seq_length, engine_mode=True):
+def format_input(input_str, tokenizer, max_seq_length, engine_mode=True, enable_debug=False):
     """
     输入数据格式化
     :param input_str: 输入的句子
     :param tokenizer: 分词器
     :param max_seq_length: 最大序列长度
     :param engine_mode: 推理模式
+    :param enable_debug: 是否启用DEBUG
 
     :return:
     """
@@ -68,6 +69,9 @@ def format_input(input_str, tokenizer, max_seq_length, engine_mode=True):
                 }
             ]
         }
+        if enable_debug:
+            for name in ["last_transformer_output"]:
+                model_data["outputs"].append({"name": name})
     else:
         model_data = {
             "inputs": [
@@ -100,12 +104,15 @@ def format_input(input_str, tokenizer, max_seq_length, engine_mode=True):
     return model_data
 
 
-def triton_post(input_str, tokenizer, max_seq_length, url, session, engine_mode=True):
-    input_str = format_input(input_str, tokenizer, max_seq_length, engine_mode)
+def triton_post(input_str, tokenizer, max_seq_length, url, session, engine_mode=True, enable_debug=False):
+    input_str = format_input(input_str, tokenizer, max_seq_length, engine_mode, enable_debug)
     if engine_mode:
         # engine 版本
         binary_res = session.post(url, ujson.dumps(input_str)).content
-        return np.frombuffer(binary_res[-3072:], dtype='<f4')
+        if enable_debug:
+            return binary_res
+        else:
+            return np.frombuffer(binary_res[-3072:], dtype='<f4')
     else:
         # savemodel 版本
         res = session.post(url, ujson.dumps({'inputs': input_str})).json()
