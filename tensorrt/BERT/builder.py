@@ -395,9 +395,11 @@ def get_single_token(network, input_tensor, index=0, enable_gather=True):
 
 def get_transformer_pooling(network, input_tensor, layer_index=-1, mode="average"):
     """
-    获取Transformer
+    获取Transformer某层的池化输出, 池化类型包括average pooling和max pooling两种模式
 
     """
+
+
 
 def pooling_output(prefix, config, init_dict, network, input_tensor, mode="cls"):
     """
