@@ -82,8 +82,8 @@ RUN cd /tmp && \
 # Download NGC client
 RUN cd /usr/local/bin && wget https://ngc.nvidia.com/downloads/ngccli_cat_linux.zip && unzip ngccli_cat_linux.zip && chmod u+x ngc && rm ngccli_cat_linux.zip ngc.md5 && echo "no-apikey\nascii\n" | ngc config set
 
-# Git获取源码
-RUN cd /workspace && git clone -b master https://github.com/nvidia/TensorRT TensorRT && \
+# Git获取TensorRT源码
+RUN cd /workspace && git clone -b release/${TRT_VERSION%.*} https://github.com/nvidia/TensorRT TensorRT && \
     cd /workspace/TensorRT && git submodule update --init --recursive
 
 # Set environment and working directory
