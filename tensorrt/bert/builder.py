@@ -453,6 +453,7 @@ def ner_output(prefix, config, init_dict, network, input_tensor):
     idims = input_tensor.shape  # [seq_len, batch_size, hidden_size, 1, 1]
     assert len(idims) == 5
     hidden_size = idims[2]
+    sequence_length = idims[0]
 
     # 转置层
     transpose_layer = network.add_shuffle(input_tensor)
@@ -472,25 +473,24 @@ def ner_output(prefix, config, init_dict, network, input_tensor):
     ner_b = trt.Weights(np.ascontiguousarray(np.random.rand(label_counts), dtype=np.float32))
 
     if config.use_int8:
-        ner_layer = network.add_convolution_nd(input_tensor, label_counts, (1, 1), ner_w, ner_b)
+        ner_layer = network.add_convolution_nd(transpose_layer_output, label_counts, (1, 1), ner_w, ner_b)
     else:
-        ner_layer = network.add_fully_connected(input_tensor, label_counts, ner_w, ner_b)
+        ner_layer = network.add_fully_connected(transpose_layer_output, label_counts, ner_w, ner_b)
 
     ner_layer.name = prefix + "dense_layer"
     ner_layer_output = ner_layer.get_output(0)  # [batch_size, seq_len, label_counts, 1, 1]
     set_tensor_name(ner_layer_output, prefix, "dense_layer_output")
 
-    # # Softmax层
-    # softmax_layer = network.add_softmax(ner_layer_output)
-    # softmax_layer.axes = 1 << 2
-    # softmax_layer.name = prefix + "softmax_layer"
-    # softmax_output = softmax_layer.get_output(0)
-    # set_tensor_name(softmax_output, prefix, "softmax_output")
-    #
-    # # TopK层, Softmax + TopK会自动进行kernel fusion
-    # topk_layer = network.add_topk(input=softmax_output, op=trt.TopKOperation.MAX, k=1, axes=1 << 2)
-    # topk_layer.name = prefix + "topk_layer"
-    return ner_layer
+    softmax_layer = network.add_softmax(ner_layer_output)
+    softmax_layer.axes = 1 << 2
+    softmax_layer.name = prefix + "softmax_layer"
+    softmax_output = softmax_layer.get_output(0)
+    set_tensor_name(softmax_output, prefix, "softmax_output")
+
+    # TopK层, Softmax + TopK会自动进行kernel fusion
+    topk_layer = network.add_topk(input=softmax_output, op=trt.TopKOperation.MAX, k=1, axes=1 << 2)
+    topk_layer.name = prefix + "topk_layer"
+    return topk_layer
 
 
 def emb_layernorm(builder, network, config, weights_dict, builder_config, sequence_lengths, batch_sizes):
