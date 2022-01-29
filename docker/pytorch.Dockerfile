@@ -94,8 +94,7 @@ RUN apt-get update --fix-missing && \
     npm cache clean --force
 
 # deal with vim and matplotlib Mojibake
-#COPY simhei.ttf /usr/local/lib/python${PYTHON_VERSION}/site-packages/matplotlib/mpl-data/fonts/ttf/
-COPY simhei.ttf /usr/local/lib/python${PYTHON_VERSION}/dist-packages/matplotlib/mpl-data/fonts/ttf/
+COPY simhei.ttf /opt/conda/lib/python${PYTHON_VERSION}/site-packages/matplotlib/mpl-data/fonts/ttf/
 RUN echo "set encoding=utf-8 nobomb" >> /etc/vim/vimrc && \
     echo "set termencoding=utf-8" >> /etc/vim/vimrc && \
     echo "set fileencodings=utf-8,gbk,utf-16le,cp1252,iso-8859-15,ucs-bom" >> /etc/vim/vimrc && \
