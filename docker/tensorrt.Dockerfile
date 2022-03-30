@@ -1,10 +1,10 @@
-ARG CUDA_VERSION=11.3.1
+ARG CUDA_VERSION=11.4.2
 ARG OS_VERSION=20.04
 
 FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-devel-ubuntu${OS_VERSION}
 LABEL maintainer="NVIDIA CORPORATION"
 
-ENV TRT_VERSION 8.0.3
+ENV TRT_VERSION 8.2.1.8
 SHELL ["/bin/bash", "-c"]
 
 # Setup user account
@@ -51,7 +51,7 @@ RUN apt-get install -y --no-install-recommends \
     ln -s /usr/bin/pip3 pip;
 
 # Install TensorRT
-RUN v="${TRT_VERSION%}-1+cuda${CUDA_VERSION%.*}" &&\
+RUN v="${TRT_VERSION%.*}-1+cuda${CUDA_VERSION%.*}" &&\
     apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub &&\
     apt-get update &&\
     sudo apt-get install libnvinfer8=${v} libnvonnxparsers8=${v} libnvparsers8=${v} libnvinfer-plugin8=${v} \
@@ -61,29 +61,37 @@ RUN v="${TRT_VERSION%}-1+cuda${CUDA_VERSION%.*}" &&\
 # Install PyPI packages
 RUN pip3 install --upgrade pip
 RUN pip3 install setuptools>=41.0.0
-RUN pip3 install \
-    onnx \
-    onnxruntime \
+RUN pip3 install nvidia-pyindex && \
+    pip3 install \
+    numpy \
     tensorflow-gpu \
     torch \
+    transformers \
+    onnx \
+    onnxruntime \
     Pillow \
-    numpy \
     pycuda \
     pytest \
-    minio
+    tabulate \
+    polygraphy \
+    onnx_graphsurgeon
 
-# Install Cmake
-RUN cd /tmp && \
-    wget https://github.com/Kitware/CMake/releases/download/v3.14.4/cmake-3.14.4-Linux-x86_64.sh && \
-    chmod +x cmake-3.14.4-Linux-x86_64.sh && \
-    ./cmake-3.14.4-Linux-x86_64.sh --prefix=/usr/local --exclude-subdir --skip-license && \
-    rm ./cmake-3.14.4-Linux-x86_64.sh
+# install cmake
+ENV CMAKE_VERSION=3.22.3
+ENV CMAKE_DIR=/usr/local
+ARG CMAKE_MIRROR=https://github.com/Kitware/CMake/releases/download
+RUN set -x && \
+    cmake_sh="cmake-${CMAKE_VERSION}-Linux-x86_64.sh" && \
+    wget --quiet "${CMAKE_MIRROR}/v${CMAKE_VERSION}/${cmake_sh}" && \
+    chmod +x ${cmake_sh} && \
+    ./${cmake_sh} --prefix=${CMAKE_DIR} --exclude-subdir --skip-license && \
+    rm ${cmake_sh}
 
 # Download NGC client
 RUN cd /usr/local/bin && wget https://ngc.nvidia.com/downloads/ngccli_cat_linux.zip && unzip ngccli_cat_linux.zip && chmod u+x ngc && rm ngccli_cat_linux.zip ngc.md5 && echo "no-apikey\nascii\n" | ngc config set
 
 # Git获取TensorRT源码
-RUN cd /workspace && git clone -b release/${TRT_VERSION%.*} https://github.com/nvidia/TensorRT TensorRT && \
+RUN cd /workspace && git clone -b release/${TRT_VERSION%.*.*} https://github.com/nvidia/TensorRT TensorRT && \
     cd /workspace/TensorRT && git submodule update --init --recursive
 
 # Set environment and working directory

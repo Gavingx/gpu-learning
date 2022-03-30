@@ -36,15 +36,29 @@ RUN set -x && \
     conda clean --all -f -y
 
 # install cmake
-ENV CMAKE_VERSION=3.22.1
-ENV CMAKE_DIR=/opt
+ENV CMAKE_VERSION=3.22.3
+ENV CMAKE_DIR=/usr/local
 ARG CMAKE_MIRROR=https://github.com/Kitware/CMake/releases/download
 RUN set -x && \
-    cmake_tar="cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz" && \
-    wget --quiet "${CMAKE_MIRROR}/v${CMAKE_VERSION}/${cmake_tar}" && \
-    tar -zxvf "${cmake_tar}" -C ${CMAKE_DIR} && \
-    rm "${cmake_tar}" && \
-    ln -s ${CMAKE_DIR}/cmake-${CMAKE_VERSION}-linux-x86_64/bin/* /usr/bin
+    cmake_sh="cmake-${CMAKE_VERSION}-Linux-x86_64.sh" && \
+    wget --quiet "${CMAKE_MIRROR}/v${CMAKE_VERSION}/${cmake_sh}" && \
+    chmod +x ${cmake_sh} && \
+    ./${cmake_sh} --prefix=${CMAKE_DIR} --exclude-subdir --skip-license && \
+    rm ${cmake_sh}
+
+
+# install bazelisk
+ENV GOPATH=/usr/local/go
+ENV PATH=$PATH:$GOPATH/bin
+RUN add-apt-repository -y ppa:longsleep/golang-backports && \
+    apt-get update --fix-missing && \
+    apt-get install --no-install-recommends --allow-unauthenticated -y \
+      golang \
+      libssl-dev \
+      libmbedtls-dev \
+      && \
+    go install github.com/bazelbuild/bazelisk@latest && \
+    ln -s /usr/local/go/bin/bazelisk /usr/local/go/bin/bazel
 
 # supervisor config
 RUN mkdir /var/run/sshd
