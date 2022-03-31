@@ -56,6 +56,7 @@ RUN add-apt-repository -y ppa:longsleep/golang-backports && \
       golang \
       libssl-dev \
       libmbedtls-dev \
+      autoconf \
       && \
     go install github.com/bazelbuild/bazelisk@latest && \
     ln -s /usr/local/go/bin/bazelisk /usr/local/go/bin/bazel
