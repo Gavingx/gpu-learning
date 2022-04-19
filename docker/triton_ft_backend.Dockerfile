@@ -1,134 +1,125 @@
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:21.12-py3
-ARG SDK_IMAGE=nvcr.io/nvidia/tritonserver:21.12-py3-sdk
+# Copyright (c) 2021-2202, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-FROM ${SDK_IMAGE} AS sdk_image
 
-FROM ${BASE_IMAGE} as ftbe_sdk
-#RUN mkdir /usr/local/mpi
-#COPY --from=mpi_image /usr/local/mpi/ /usr/local/mpi/
+# -------------------------------------------------- #
+# This is a Docker image dedicated to develop
+# FasterTransformer backend. If you don't want to build the
+# backend together with tritonserver, start from here
+# -------------------------------------------------- #
+
+ARG TRITON_VERSION=21.12
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:${TRITON_VERSION}-py3
+FROM ${BASE_IMAGE} as server-builder
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    software-properties-common \
-    autoconf                   \
-    automake                   \
-    build-essential            \
-    docker.io                  \
-    git                        \
-    libre2-dev                 \
-    libssl-dev                 \
-    libtool                    \
-    libboost-dev               \
-    libcurl4-openssl-dev       \
-    libb64-dev                 \
-    patchelf                   \
-    python3-dev                \
-    python3-pip                \
-    python3-setuptools         \
-    rapidjson-dev              \
-    unzip                      \
-    wget                       \
-    zlib1g-dev                 \
-    pkg-config                 \
-    uuid-dev
+    zip unzip wget build-essential autoconf autogen gdb \
+    python3.8 python3-pip python3-dev rapidjson-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --upgrade pip && \
-    pip3 install --upgrade wheel setuptools docker && \
-    pip3 install grpcio-tools grpcio-channelz
+WORKDIR /workspace/build/
 
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-    gpg --dearmor - | \
-    tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null &&  \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1
+# CMake
+RUN CMAKE_VERSION=3.22 && \
+    CMAKE_BUILD=3.22.3 && \
+    wget -nv https://cmake.org/files/v${CMAKE_VERSION}/cmake-${CMAKE_BUILD}.tar.gz && \
+    tar -xf cmake-${CMAKE_BUILD}.tar.gz && \
+    cd cmake-${CMAKE_BUILD} && \
+    ./bootstrap --parallel=$(grep -c ^processor /proc/cpuinfo) -- -DCMAKE_USE_OPENSSL=OFF && \
+    make -j"$(grep -c ^processor /proc/cpuinfo)" install && \
+    cd /workspace/build/ && \
+    rm -rf /workspace/build/cmake-${CMAKE_BUILD}
 
+# backend build
+WORKDIR /workspace/build/fastertransformer_backend
+ADD cmake cmake
+ADD src src
+ADD CMakeLists.txt CMakeLists.txt
+ADD README.md README.md
+ADD LICENSE LICENSE
 
-################################################################################
-## COPY from Dockerfile.sdk
-################################################################################
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-            software-properties-common \
-            autoconf \
-            automake \
-            build-essential \
-            curl \
-            git \
-            libb64-dev \
-            libopencv-dev \
-            libopencv-core-dev \
-            libssl-dev \
-            libtool \
-            pkg-config \
-            python3 \
-            python3-pip \
-            python3-dev \
-            rapidjson-dev \
-            vim \
-            wget && \
-    pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade grpcio-tools && \
-    pip3 install --upgrade pip
+ARG FORCE_BACKEND_REBUILD=0
+RUN mkdir build -p && \
+    cd build && \
+    cmake \
+      -D CMAKE_EXPORT_COMPILE_COMMANDS=1 \
+      -D CMAKE_BUILD_TYPE=Release \
+      -D CMAKE_INSTALL_PREFIX=/opt/tritonserver \
+      -D TRITON_COMMON_REPO_TAG="r${NVIDIA_TRITON_SERVER_VERSION}" \
+      -D TRITON_CORE_REPO_TAG="r${NVIDIA_TRITON_SERVER_VERSION}" \
+      -D TRITON_BACKEND_REPO_TAG="r${NVIDIA_TRITON_SERVER_VERSION}" \
+      .. && \
+    make -j"$(grep -c ^processor /proc/cpuinfo)" install
 
-# Build expects "python" executable (not python3).
-RUN rm -f /usr/bin/python && \
-    ln -s /usr/bin/python3 /usr/bin/python
-# Install the dependencies needed to run the client examples. These
-# are not needed for building but including them allows this image to
-# be used to run the client examples.
-RUN pip3 install --upgrade numpy pillow
-##     find install/python/ -maxdepth 1 -type f -name \
-##     "tritonclient-*-manylinux1_x86_64.whl" | xargs printf -- '%s[all]' | \
-##     xargs pip3 install --upgrade
+FROM ${BASE_IMAGE} as server
 
-# Install DCGM
-# DCGM version to install for Model Analyzer
-ARG DCGM_VERSION=2.3.4
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb && \
-    dpkg -i datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb
+ENV NCCL_LAUNCH_MODE=GROUP
 
-# Install Model Analyzer
-ARG TRITON_MODEL_ANALYZER_REPO_TAG=r21.12
-ARG TRITON_MODEL_ANALYZER_REPO="https://github.com/triton-inference-server/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
-RUN pip3 install "git+${TRITON_MODEL_ANALYZER_REPO}"
-################################################################################
-## COPY from Dockerfile.QA
-################################################################################
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        libpng-dev \
-        curl \
-        libopencv-dev \
-        libopencv-core-dev \
-        libzmq3-dev \
-        python3-dev \
-        python3-pip \
-        python3-protobuf \
-        python3-setuptools \
-        swig \
-        golang-go \
-        nginx \
-        protobuf-compiler \
-        valgrind
+COPY --from=server-builder /opt/tritonserver/backends/fastertransformer /opt/tritonserver/backends/fastertransformer
 
-RUN pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade numpy pillow future grpcio requests gsutil awscli six boofuzz grpcio-channelz azure-cli
+# set workspace
+ENV WORKSPACE /workspace
+WORKDIR /workspace
 
-# need protoc-gen-go to generate go specific gRPC modules
-#RUN go get github.com/golang/protobuf/protoc-gen-go && \
-#    go get google.golang.org/grpc
+# Install pytorch
+RUN pip3 install torch==1.9.1+cu111 -f https://download.pytorch.org/whl/torch_stable.html  && \
+    pip3 install --extra-index-url https://pypi.ngc.nvidia.com regex fire tritonclient[all]
 
-ARG TRITON_CLIENT_VERSION=2.17.0
-COPY --from=sdk_image /workspace/install/python/tritonclient-${TRITON_CLIENT_VERSION}-py3-none-manylinux1_x86_64.whl /tmp/
-RUN pip3 install --upgrade /tmp/tritonclient-${TRITON_CLIENT_VERSION}-py3-none-manylinux1_x86_64.whl[all]
-
-RUN mkdir /opt/tritonserver/backends/fastertransformer && chmod 777 /opt/tritonserver/backends/fastertransformer
-
-FROM ftbe_sdk as ftbe_work
 # for debug
-RUN apt update -q && apt install -y --no-install-recommends openssh-server zsh tmux mosh locales-all clangd sudo
-RUN sed -i 's/#X11UseLocalhost yes/X11UseLocalhost no/g' /etc/ssh/sshd_config
-RUN mkdir /var/run/sshd
+RUN apt-get update -q && \
+    apt-get install -y --no-install-recommends openssh-server zsh tmux mosh locales-all clangd sudo && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT service ssh restart && bash
+RUN sed -i 's/#X11UseLocalhost yes/X11UseLocalhost no/g' /etc/ssh/sshd_config
+RUN mkdir /var/run/sshd -p
+
+ADD . /workspace/fastertransformer_backend
+
+# jupyter lab config
+COPY jupyter_server_config.py /root/.jupyter/
+COPY jupyter_notebook_config.py /root/.jupyter/
+COPY run_jupyter.sh /
+RUN chmod +x /run_jupyter.sh && \
+    pip install --no-cache-dir jupyterlab jupyter_http_over_ws && \
+    jupyter serverextension enable --py jupyter_http_over_ws && \
+    python -m ipykernel.kernelspec
+EXPOSE 8888
+
+# SSH config
+RUN apt-get update --fix-missing && apt-get install --no-install-recommends --allow-unauthenticated -y \
+    openssh-server pwgen && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    sed -i "s/.*UsePrivilegeSeparation.*/UsePrivilegeSeparation no/g" /etc/ssh/sshd_config && \
+    sed -i "s/.*UsePAM.*/UsePAM no/g" /etc/ssh/sshd_config && \
+    sed -i "s/.*PermitRootLogin.*/PermitRootLogin yes/g" /etc/ssh/sshd_config && \
+    sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication yes/g" /etc/ssh/sshd_config
+COPY set_root_pw.sh run_ssh.sh /
+RUN chmod +x /*.sh && sed -i -e 's/\r$//' /*.sh
+ENV AUTHORIZED_KEYS **None**
+EXPOSE 22
+
+# supervisor config
+RUN mkdir /var/run/sshd && \
+    apt-get update --fix-missing && \
+    apt-get install -y --no-install-recommends --allow-unauthenticated supervisor
+COPY supervisord.conf /
+
+COPY bashrc /etc/bash.bashrc
+RUN chmod a+rwx /etc/bash.bashrc
+
+CMD ["/usr/bin/supervisord", "-c", "/supervisord.conf"]
