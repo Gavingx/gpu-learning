@@ -1,5 +1,7 @@
 import os
-from IPython.lib import passwd
+import hashlib
+import random
+from jupyter_server.auth import passwd
 
 c.ServerApp.ip = '0.0.0.0'
 c.ServerApp.port = int(os.getenv('PORT', 8888))
@@ -11,7 +13,7 @@ if 'NOTEBOOK_PASS' in os.environ:
     c.ServerApp.password = passwd(os.environ['NOTEBOOK_PASS'])
     del os.environ['NOTEBOOK_PASS']
 else:
-    c.ServerApp.token = ''
+    c.ServerApp.password = ''
 
 if 'NOTEBOOK_USER' in os.environ:
     c.ServerApp.notebook_dir = '/root/' + os.environ['NOTEBOOK_USER']
