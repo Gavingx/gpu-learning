@@ -19,7 +19,7 @@
 # backend together with tritonserver, start from here
 # -------------------------------------------------- #
 
-ARG TRITON_VERSION=21.12
+ARG TRITON_VERSION=22.04
 ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:${TRITON_VERSION}-py3
 FROM ${BASE_IMAGE} as server-builder
 
@@ -90,13 +90,13 @@ RUN mkdir /var/run/sshd -p
 ADD . /workspace/fastertransformer_backend
 
 # jupyter lab config
-COPY jupyter_server_config.py /root/.jupyter/
-COPY jupyter_notebook_config.py /root/.jupyter/
-COPY run_jupyter.sh /
+COPY docker/jupyter_server_config.py /root/.jupyter/
+COPY docker/jupyter_notebook_config.py /root/.jupyter/
+COPY docker/run_jupyter.sh /
 RUN chmod +x /run_jupyter.sh && \
     pip install --no-cache-dir jupyterlab jupyter_http_over_ws && \
     jupyter serverextension enable --py jupyter_http_over_ws && \
-    python -m ipykernel.kernelspec
+    python3 -m ipykernel.kernelspec
 EXPOSE 8888
 
 # SSH config
@@ -108,18 +108,17 @@ RUN apt-get update --fix-missing && apt-get install --no-install-recommends --al
     sed -i "s/.*UsePAM.*/UsePAM no/g" /etc/ssh/sshd_config && \
     sed -i "s/.*PermitRootLogin.*/PermitRootLogin yes/g" /etc/ssh/sshd_config && \
     sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication yes/g" /etc/ssh/sshd_config
-COPY set_root_pw.sh run_ssh.sh /
+COPY docker/set_root_pw.sh docker/run_ssh.sh /
 RUN chmod +x /*.sh && sed -i -e 's/\r$//' /*.sh
 ENV AUTHORIZED_KEYS **None**
 EXPOSE 22
 
 # supervisor config
-RUN mkdir /var/run/sshd && \
-    apt-get update --fix-missing && \
+RUN apt-get update --fix-missing && \
     apt-get install -y --no-install-recommends --allow-unauthenticated supervisor
-COPY supervisord.conf /
+COPY docker/supervisord.conf /
 
-COPY bashrc /etc/bash.bashrc
+COPY docker/bashrc /etc/bash.bashrc
 RUN chmod a+rwx /etc/bash.bashrc
 
 CMD ["/usr/bin/supervisord", "-c", "/supervisord.conf"]
