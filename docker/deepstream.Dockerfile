@@ -4,7 +4,7 @@ FROM nvcr.io/nvidia/deepstream:${DEEPSTREAM_VERSION}-devel
 MAINTAINER Xiangyang Kan <xiangyangkan@outlook.com>
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
-ENV PYTHON_VERSION=3.9
+ENV PYTHON_VERSION=3.8
 
 # Needed for string substitution
 SHELL ["/bin/bash", "-c"]
@@ -18,7 +18,9 @@ RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && \
 # install conda
 ENV CONDA_DIR=/opt/conda
 ENV PATH="${CONDA_DIR}/bin:${PATH}"
-ARG CONDA_MIRROR=https://github.com/conda-forge/miniforge/releases/latest/download
+# Specify Python 3.8 Version
+ARG CONDA_VERSION=4.9.2-7
+ARG CONDA_MIRROR=https://github.com/conda-forge/miniforge/releases/download/${CONDA_VERSION}
 RUN set -x && \
     # Miniforge installer
     miniforge_arch=$(uname -m) && \
@@ -32,8 +34,32 @@ RUN set -x && \
     mamba list python | grep '^python ' | tr -s ' ' | cut -d ' ' -f 1,2 >> "${CONDA_DIR}/conda-meta/pinned" && \
     # Using conda to update all packages: https://github.com/mamba-org/mamba/issues/1092
     conda update --all --quiet --yes && \
-    conda install -y numpy conda-pack jupyterlab nodejs gst-python && \
+    conda install -y \
+      numpy \
+      conda-pack \
+      jupyterlab \
+      nodejs && \
     conda clean --all -f -y
+
+
+# install gst-python and pyds
+RUN apt-get update --fix-missing && apt-get install --no-install-recommends --allow-unauthenticated -y \
+      libpython${PYTHON_VERSION}-dev \
+      python-gi-dev \
+      libgirepository1.0-dev \
+      libcairo2-dev \
+      apt-transport-https \
+      ca-certificates  \
+      && \
+    update-ca-certificates && \
+    git clone https://github.com/NVIDIA-AI-IOT/deepstream_python_apps.git && cd deepstream_python_apps && \
+    git submodule update --init && cd 3rdparty/gst-python && \
+    ./autogen.sh && make && make install && \
+    cd ../../bindings && mkdir build && cd build && \
+    cmake .. -DPYTHON_MAJOR_VERSION=3 -DPYTHON_MINOR_VERSION=8  \
+      -DPIP_PLATFORM=linux_x86_64 -DS_PATH=/opt/nvidia/deepstream/deepstream && \
+    make  && \
+    pip3 install ./pyds-1.1.1-py3-none*.whl
 
 
 # SSH config
