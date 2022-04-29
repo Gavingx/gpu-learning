@@ -17,7 +17,7 @@
 
 
 ## 启动DeepStream APP  
-`cd /opt/nvidia/deepstream/deepstream/deepstream_python_apps/apps/deepstream-rtsp-in-rtsp-out && 
+`cd /opt/nvidia/deepstream/deepstream/samples/deepstream_python_apps/apps/deepstream-rtsp-in-rtsp-out && 
  python3 deepstream_test1_rtsp_in_rtsp_out.py -i rtsp://rtsp-server:8554/stream_1 -g nvinferserver`
 
 DeepStream应用的输出也是一个RTSP视频流，在宿主机下的地址为 `rtsp://127.0.0.1:18554/ds-test`  
