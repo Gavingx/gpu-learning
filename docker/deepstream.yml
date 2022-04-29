@@ -2,7 +2,7 @@ version: "3.7"
 
 services:
   deepstream:
-    image: rivia/deepstream:6.0.1-devel
+    image: rivia/deepstream:6.0.1-triton
     hostname: deepstream
     ports:
       - "0.0.0.0:18554:8554"
@@ -23,30 +23,6 @@ services:
             - capabilities: [ gpu ]
               count: all
     container_name: deepstream
-
-  deepstream-triton:
-    image: nvcr.io/nvidia/deepstream:6.0.1-triton
-    hostname: deepstream-triton
-    ports:
-      - "0.0.0.0:28554:8554"
-      - "0.0.0.0:10090:8888"
-      - "0.0.0.0:40005:22"
-    volumes:
-      - "/data/aigroup:/root/aigroup"
-      - "/etc/localtime:/etc/localtime"
-    environment:
-      ROOT_PASS: "123456"
-      NOTEBOOK_PASS: "123456"
-      NOTEBOOK_USER: "aigroup"
-    restart: always
-    tty: true
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [ gpu ]
-              count: all
-    container_name: deepstream-triton
 
   rtsp-server:
     image: aler9/rtsp-simple-server:latest

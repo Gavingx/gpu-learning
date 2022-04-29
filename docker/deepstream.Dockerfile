@@ -1,5 +1,5 @@
 ARG DEEPSTREAM_VERSION=6.0.1
-FROM nvcr.io/nvidia/deepstream:${DEEPSTREAM_VERSION}-devel
+FROM nvcr.io/nvidia/deepstream:${DEEPSTREAM_VERSION}-triton
 
 MAINTAINER Xiangyang Kan <xiangyangkan@outlook.com>
 
@@ -43,15 +43,18 @@ RUN set -x && \
 
 
 # install gst-python and pyds
-RUN apt-get update --fix-missing && apt-get install --no-install-recommends --allow-unauthenticated -y \
+RUN sed -i "s/deb https\:\/\/developer/# deb https\:\/\/developer/g" /etc/apt/sources.list && \
+    apt-get update --fix-missing && apt-get install --no-install-recommends --allow-unauthenticated -y \
       libpython${PYTHON_VERSION}-dev \
       python-gi-dev \
       libgirepository1.0-dev \
       libcairo2-dev \
       apt-transport-https \
-      ca-certificates  \
+      ca-certificates \
+      ffmpeg  \
       && \
     update-ca-certificates && \
+    cd samples && \
     git clone https://github.com/NVIDIA-AI-IOT/deepstream_python_apps.git && cd deepstream_python_apps && \
     git submodule update --init && cd 3rdparty/gst-python && \
     ./autogen.sh && make && make install && \
@@ -115,4 +118,6 @@ COPY bashrc /etc/bash.bashrc
 RUN chmod a+rwx /etc/bash.bashrc
 RUN env | egrep -v "^(LS_COLORS=|SSH_CONNECTION=|USER=|PWD=|HOME=|SSH_CLIENT=|SSH_TTY=|MAIL=|TERM=|SHELL=|SHLVL=|LOGNAME=|PS1=|_=)" > /etc/environment
 
-CMD ["/usr/bin/supervisord", "-c", "/supervisord.conf"]
+ENTRYPOINT ["/usr/bin/supervisord", "-c"]
+
+CMD ["/supervisord.conf"]
