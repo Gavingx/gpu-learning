@@ -1,4 +1,4 @@
-ARG NGC_VERSION=21.09
+ARG NGC_VERSION=22.04
 FROM nvcr.io/nvidia/tritonserver:${NGC_VERSION}-py3
 
 MAINTAINER Xiangyang Kan <xiangyangkan@outlook.com>

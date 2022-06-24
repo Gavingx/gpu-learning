@@ -18,13 +18,15 @@ RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && \
 # install conda
 ENV CONDA_DIR=/opt/conda
 ENV PATH="${CONDA_DIR}/bin:${PATH}"
+# ARG CONDA_MIRROR=https://github.com/conda-forge/miniforge/releases/latest/download
+ARG CONDA_MIRROR=https://repo.anaconda.com/miniconda
 # Specify Python 3.8 Version
-ARG CONDA_VERSION=4.9.2-7
-ARG CONDA_MIRROR=https://github.com/conda-forge/miniforge/releases/download/${CONDA_VERSION}
+ARG CONDA_VERSION=4.12.0
 RUN set -x && \
     # Miniforge installer
     miniforge_arch=$(uname -m) && \
-    miniforge_installer="Mambaforge-Linux-${miniforge_arch}.sh" && \
+    # miniforge_installer="Mambaforge-Linux-${miniforge_arch}.sh" && \
+    miniforge_installer="Miniconda3-py38_${CONDA_VERSION}-Linux-${miniforge_arch}.sh" && \
     wget --quiet "${CONDA_MIRROR}/${miniforge_installer}" && \
     /bin/bash "${miniforge_installer}" -f -b -p "${CONDA_DIR}" && \
     rm "${miniforge_installer}" && \

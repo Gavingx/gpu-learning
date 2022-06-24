@@ -2,7 +2,7 @@ version: "3.7"
 
 services:
   tensorflow:
-    image: rivia/tensorflow-1:21.12
+    image: rivia/tensorflow-1:22.04
     hostname: tensorflow
     ports:
       - "0.0.0.0:8888:8888"
@@ -24,7 +24,7 @@ services:
     container_name: tensorflow
 
   pytorch:
-    image: rivia/pytorch:21.12
+    image: rivia/pytorch:22.04
     hostname: pytorch
     ports:
       - "0.0.0.0:18888:8888"
@@ -46,7 +46,7 @@ services:
     container_name: pytorch
 
   tensorrt:
-    image: rivia/tensorrt:8.2.1.8-r21.12
+    image: rivia/tensorrt:8.2.4.2-r22.04
     hostname: tensorrt
     ports:
       - "0.0.0.0:10001:22"
@@ -69,7 +69,7 @@ services:
     container_name: tensorrt
 
   triton_server:
-    image: rivia/tritonserver:21.12
+    image: rivia/tritonserver:22.04
     ulimits:
       memlock: -1
       stack: 67108864
@@ -95,13 +95,13 @@ services:
               count: all
     container_name: triton_server
 
-  triton_python_backend:
-    image: rivia/triton_python_backend:21.12
+  triton_backend:
+    image: rivia/triton_backend:22.04
     ulimits:
       memlock: -1
       stack: 67108864
     shm_size: "10gb"
-    hostname: triton_python_backend
+    hostname: triton_backend
     ports:
       - "0.0.0.0:20002:22"
       - "0.0.0.0:18000:8000"
@@ -120,38 +120,10 @@ services:
           devices:
             - capabilities: [ gpu ]
               count: all
-    container_name: triton_python_backend
-
-  triton_ft_backend:
-    image: rivia/triton_ft_backend:21.12
-    ulimits:
-      memlock: -1
-      stack: 67108864
-    shm_size: "10gb"
-    hostname: triton_ft_backend
-    tty: true
-    ports:
-      - "0.0.0.0:30002:22"
-      - "0.0.0.0:28000:8000"
-      - "0.0.0.0:28001:8001"
-      - "0.0.0.0:28002:8002"
-    volumes:
-      - "/data/aigroup:/root/aigroup"
-      - "/etc/localtime:/etc/localtime"
-    environment:
-      ROOT_PASS: "123456"
-      NVIDIA_VISIBLE_DEVICES: "all"
-    restart: always
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [ gpu ]
-              count: all
-    container_name: triton_ft_backend
+    container_name: triton_backend
 
   tensorboard:
-    image: rivia/tensorflow-1:21.12
+    image: rivia/tensorflow-1:22.04
     hostname: tensorboard
     ports:
       - "0.0.0.0:6006:6006"

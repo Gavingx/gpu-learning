@@ -4,7 +4,7 @@ ARG OS_VERSION=20.04
 FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-devel-ubuntu${OS_VERSION}
 LABEL maintainer="NVIDIA CORPORATION"
 
-ENV TRT_VERSION 8.2.1.8
+ENV TRT_VERSION 8.2.4.2
 SHELL ["/bin/bash", "-c"]
 
 # Setup user account
@@ -58,23 +58,31 @@ RUN v="${TRT_VERSION%.*}-1+cuda${CUDA_VERSION%.*}" &&\
         libnvinfer-dev=${v} libnvonnxparsers-dev=${v} libnvparsers-dev=${v} libnvinfer-plugin-dev=${v} \
         python3-libnvinfer=${v}
 
-# Install PyPI packages
-RUN pip3 install --upgrade pip
-RUN pip3 install setuptools>=41.0.0
-RUN pip3 install nvidia-pyindex && \
-    pip3 install \
-    numpy \
-    tensorflow-gpu \
-    torch \
-    transformers \
-    onnx \
-    onnxruntime \
-    Pillow \
-    pycuda \
-    pytest \
-    tabulate \
-    polygraphy \
-    onnx_graphsurgeon
+
+# extra dependencies
+COPY python_requirements.txt debian_requirements.txt /
+RUN apt-get update --fix-missing && \
+    cat /debian_requirements.txt | xargs apt-get install -y --no-install-recommends --allow-unauthenticated && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m pip install --user --upgrade pip && \
+    pip install --no-cache-dir -r /python_requirements.txt && \
+    pip install --no-cache-dir \
+        nvidia-pyindex \
+        tensorflow-gpu \
+        torch \
+        torchvision \
+        transformers \
+        onnx \
+        onnxruntime-gpu \
+        Pillow \
+        pycuda \
+        pytest \
+        tabulate \
+        polygraphy \
+        onnx_graphsurgeon
+
 
 # install cmake
 ENV CMAKE_VERSION=3.22.3
@@ -88,7 +96,7 @@ RUN set -x && \
     rm ${cmake_sh}
 
 # Download NGC client
-RUN cd /usr/local/bin && wget https://ngc.nvidia.com/downloads/ngccli_cat_linux.zip && unzip ngccli_cat_linux.zip && chmod u+x ngc && rm ngccli_cat_linux.zip ngc.md5 && echo "no-apikey\nascii\n" | ngc config set
+RUN cd /usr/local/bin && wget https://ngc.nvidia.com/downloads/ngccli_cat_linux.zip && unzip ngccli_cat_linux.zip && chmod u+x ngc-cli/ngc && rm ngccli_cat_linux.zip ngc-cli.md5 && echo "no-apikey\nascii\n" | ngc-cli/ngc config set
 
 # Git获取TensorRT源码
 RUN cd /workspace && git clone -b release/${TRT_VERSION%.*.*} https://github.com/nvidia/TensorRT TensorRT && \

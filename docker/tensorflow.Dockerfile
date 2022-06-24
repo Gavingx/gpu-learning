@@ -1,4 +1,4 @@
-ARG NGC_VERSION=21.09
+ARG NGC_VERSION=22.04
 ARG TENSORFLOW_MAJOR_VERSION=1
 FROM nvcr.io/nvidia/tensorflow:${NGC_VERSION}-tf${TENSORFLOW_MAJOR_VERSION}-py3
 
@@ -15,49 +15,17 @@ ARG TZ="Asia/Shanghai"
 RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && \
     echo ${TZ} > /etc/timezone
 
+
 # extra dependencies
 COPY python_requirements.txt debian_requirements.txt /
 RUN apt-get update --fix-missing && \
     cat /debian_requirements.txt | xargs apt-get install -y --no-install-recommends --allow-unauthenticated && \
-    apt-get install -y --no-install-recommends --allow-unauthenticated \
-        default-libmysqlclient-dev  \
-        libpq-dev \
-        sasl2-bin \
-        libsasl2-2 \
-        libsasl2-dev \
-        libsasl2-modules && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m pip install --user --upgrade pip && \
-    pip install --no-cache-dir pybind11 thrift sasl thrift_sasl smart_open==2.0.0 && \
-    pip install --no-cache-dir \
-        SQLAlchemy \
-        mysqlclient \
-        psycopg2 \
-        pyhive \
-        elasticsearch \
-        redis \
-        redis-py-cluster \
-        aredis \
-        shapely \
-        gensim \
-        hnswlib \
-        pandarallel \
-        minio \
-        gunicorn \
-        uvicorn \
-        fastapi \
-        ujson \
-        pyarrow==3.0.0 \
-        fastparquet==0.5.0 \
-        dask[dataframe] \
-        clickhouse-driver \
-        openpyxl \
-        uvloop \
-        httptools \
-        seaborn \
-        nvidia-ml-py
+    pip install --no-cache-dir -r /python_requirements.txt
+
 
 # SSH config
 RUN apt-get update --fix-missing && apt-get install --no-install-recommends --allow-unauthenticated -y \
@@ -82,16 +50,7 @@ RUN chmod +x /run_jupyter.sh && \
     pip install --no-cache-dir jupyter_http_over_ws && \
     jupyter serverextension enable --py jupyter_http_over_ws && \
     python -m ipykernel.kernelspec
-RUN apt-get update --fix-missing && \
-    apt-get install -y --no-install-recommends --allow-unauthenticated npm && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    jupyter labextension install \
-        @jupyter-widgets/jupyterlab-manager \
-        @jupyterlab/hub-extension \
-        jupyter-matplotlib \
-        && \
-    npm cache clean --force
+
 
 # deal with vim and matplotlib Mojibake
 #COPY simhei.ttf /usr/local/lib/python${PYTHON_VERSION}/site-packages/matplotlib/mpl-data/fonts/ttf/
